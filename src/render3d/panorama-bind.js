@@ -1,10 +1,19 @@
 import * as THREE from 'three';
 import { PRESET_MATERIALS, buildDisplayAssignments } from '../upload/material-router.js';
 
+const EAGER_LOAD_COUNT = 8;
+const BACKGROUND_BATCH_SIZE = 2;
+const PLACEHOLDER_IMAGE = new THREE.Color('#293857');
+const PLACEHOLDER_VIDEO = new THREE.Color('#38482d');
+const PLACEHOLDER_PANORAMA = new THREE.Color('#3e3052');
+
 let textureLoader = null;
+let bindVersion = 0;
+let queueTimer = 0;
 let offReady = null;
 let offMaterials = null;
 let offShards = null;
+let offState = null;
 const mediaCache = new Map();
 
 function getLoader() {
@@ -20,6 +29,7 @@ function createImageResource(url) {
         resolve({
           kind: 'image',
           texture,
+          url,
           dispose() {
             texture.dispose();
           },
@@ -39,19 +49,25 @@ function createVideoResource(url) {
     video.loop = true;
     video.playsInline = true;
     video.crossOrigin = 'anonymous';
-    video.preload = 'auto';
+    video.preload = 'metadata';
 
-    const onLoaded = async () => {
+    const onLoaded = () => {
       cleanup();
-      try {
-        await video.play();
-      } catch {}
-
       const texture = new THREE.VideoTexture(video);
+      texture.generateMipmaps = false;
       resolve({
         kind: 'video',
         texture,
         mediaEl: video,
+        url,
+        async play() {
+          try {
+            await video.play();
+          } catch {}
+        },
+        pause() {
+          video.pause();
+        },
         dispose() {
           video.pause();
           video.removeAttribute('src');
@@ -73,6 +89,7 @@ function createVideoResource(url) {
 
     video.addEventListener('loadeddata', onLoaded, { once: true });
     video.addEventListener('error', onError, { once: true });
+    video.load();
   });
 }
 
@@ -93,6 +110,7 @@ async function disposeResource(url) {
 
   try {
     const resource = await pending;
+    resource.pause?.();
     resource.dispose?.();
   } catch {}
 
@@ -108,19 +126,45 @@ async function pruneUnusedResources(assignments) {
 function configureTexture(texture, config) {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.center.set(0.5, 0.5);
+  texture.repeat.set(1, 1);
 
   if (config?.projection === 'panorama') {
     texture.wrapS = THREE.RepeatWrapping;
-    texture.repeat.set(1, 1);
-    texture.center.set(0.5, 0.5);
   } else {
     texture.wrapS = THREE.ClampToEdgeWrapping;
-    texture.wrapT = THREE.ClampToEdgeWrapping;
-    texture.repeat.set(1, 1);
-    texture.center.set(0.5, 0.5);
   }
 
   texture.needsUpdate = true;
+}
+
+function getPlaceholderColor(config) {
+  if (config?.projection === 'panorama') return PLACEHOLDER_PANORAMA;
+  if (config?.type === 'video') return PLACEHOLDER_VIDEO;
+  return PLACEHOLDER_IMAGE;
+}
+
+function applyShardMetadata(shard, config) {
+  shard.mesh.userData.shardId = shard.id;
+  shard.mesh.userData.slotIndex = config.slotIndex ?? shard.index;
+  shard.mesh.userData.sourceId = config.sourceId ?? config.id;
+  shard.mesh.userData.materialName = config.name || config.id;
+  shard.mesh.userData.materialType = config.type;
+  shard.mesh.userData.materialUrl = config.url;
+  shard.mesh.userData.projection = config.projection;
+  shard.mesh.userData.distortionProfile = config.distortionProfile;
+  shard.mesh.userData.repeated = !!config.repeated;
+}
+
+function applyPlaceholder(shard, config) {
+  shard.material.map = null;
+  shard.material.color.copy(getPlaceholderColor(config));
+  shard.material.opacity = 0.92;
+  shard.material.emissive?.set(config.type === 'video' ? '#1c240f' : '#141f34');
+  shard.material.emissiveIntensity = config.projection === 'panorama' ? 0.22 : 0.16;
+  shard.material.needsUpdate = true;
+  applyShardMetadata(shard, config);
 }
 
 function getAssignments() {
@@ -132,30 +176,122 @@ function getAssignments() {
   return assignments;
 }
 
+function clearQueueTimer() {
+  if (!queueTimer) return;
+  window.clearTimeout(queueTimer);
+  queueTimer = 0;
+}
+
+function getLoadOrder(shards) {
+  const order = Array.from({ length: shards.length }, (_, index) => index);
+  const activeIndex = shards.findIndex((shard) => shard.id === window.SM.activeShardId);
+  if (activeIndex > 0) {
+    order.splice(activeIndex, 1);
+    order.unshift(activeIndex);
+  }
+  return order;
+}
+
+async function syncVideoPlayback() {
+  const stateAllowsPlayback = window.SM.currentState === 'sphere' || window.SM.currentState === 'share';
+  const assignments = getAssignments();
+  const activeUrls = new Set();
+
+  if (stateAllowsPlayback) {
+    const shards = window.SM?.modules?.render3d?.shardMesh?.getShards?.() ?? [];
+    const activeIndex = shards.findIndex((shard) => shard.id === window.SM.activeShardId);
+    const activeAssignment = activeIndex >= 0 ? assignments[activeIndex % assignments.length] : null;
+
+    if (activeAssignment?.type === 'video') {
+      activeUrls.add(activeAssignment.url);
+    } else {
+      const fallbackVideo = assignments.find((item) => item.type === 'video');
+      if (fallbackVideo) activeUrls.add(fallbackVideo.url);
+    }
+  }
+
+  const resources = await Promise.allSettled(Array.from(mediaCache.values()));
+  await Promise.all(resources.map(async (entry) => {
+    if (entry.status !== 'fulfilled' || entry.value.kind !== 'video') return;
+    if (activeUrls.has(entry.value.url)) {
+      await entry.value.play?.();
+      return;
+    }
+    entry.value.pause?.();
+  }));
+}
+
+async function hydrateShard(shard, config, version) {
+  try {
+    const resource = await loadMediaResource(config);
+    if (version !== bindVersion) return;
+
+    configureTexture(resource.texture, config);
+    shard.material.map = resource.texture;
+    shard.material.color.set('#ffffff');
+    shard.material.opacity = 0.98;
+    shard.material.emissive?.set(config.type === 'video' ? '#113012' : '#0f1c32');
+    shard.material.emissiveIntensity = config.type === 'video' ? 0.24 : 0.14;
+    shard.material.needsUpdate = true;
+    applyShardMetadata(shard, config);
+    void syncVideoPlayback();
+  } catch (error) {
+    if (version !== bindVersion) return;
+    console.warn('[panoramaBind] media load failed:', error?.message || error);
+  }
+}
+
+function queueBackgroundHydration(tasks, version) {
+  clearQueueTimer();
+  if (!tasks.length) return;
+
+  const tick = async () => {
+    if (version !== bindVersion) return;
+
+    const batch = tasks.splice(0, BACKGROUND_BATCH_SIZE);
+    await Promise.all(batch.map((task) => task()));
+
+    if (tasks.length) {
+      queueTimer = window.setTimeout(tick, 64);
+    } else {
+      queueTimer = 0;
+    }
+  };
+
+  queueTimer = window.setTimeout(tick, 80);
+}
+
 async function bind(assignments, shards) {
   const safeAssignments = assignments?.length ? assignments : getAssignments();
   if (!shards?.length) return;
 
+  const version = bindVersion + 1;
+  bindVersion = version;
+  clearQueueTimer();
   await pruneUnusedResources(safeAssignments);
 
-  await Promise.all(shards.map(async (shard, index) => {
+  const order = getLoadOrder(shards);
+  shards.forEach((shard, index) => {
     const config = safeAssignments[index % safeAssignments.length];
-    const resource = await loadMediaResource(config);
-    configureTexture(resource.texture, config);
-    shard.material.map = resource.texture;
-    shard.material.color = new THREE.Color('#ffffff');
-    shard.material.opacity = 0.98;
-    shard.material.needsUpdate = true;
-    shard.mesh.userData.shardId = shard.id;
-    shard.mesh.userData.materialName = config.name || config.id;
-    shard.mesh.userData.materialType = config.type;
-    shard.mesh.userData.projection = config.projection;
-    shard.mesh.userData.distortionProfile = config.distortionProfile;
+    applyPlaceholder(shard, config);
+  });
+
+  const eagerOrder = order.slice(0, Math.min(EAGER_LOAD_COUNT, order.length));
+  const backgroundOrder = order.slice(eagerOrder.length);
+
+  await Promise.all(eagerOrder.map((index) => {
+    const config = safeAssignments[index % safeAssignments.length];
+    return hydrateShard(shards[index], config, version);
   }));
 
-  window.SM.bus.emit('materials:bound', {
-    count: safeAssignments.length,
+  const queuedTasks = backgroundOrder.map((index) => {
+    const config = safeAssignments[index % safeAssignments.length];
+    return () => hydrateShard(shards[index], config, version);
   });
+
+  queueBackgroundHydration(queuedTasks, version);
+  void syncVideoPlayback();
+  window.SM.bus.emit('materials:bound', { count: safeAssignments.length });
 }
 
 async function refreshBindings() {
@@ -174,8 +310,12 @@ async function swapTo(shardId, animate = true) {
 
   shards.forEach((shard) => {
     const isActive = shard.id === shardId;
-    shard.material.color = new THREE.Color(isActive ? '#ffe5a3' : '#ffffff');
+    shard.material.color = new THREE.Color(isActive ? '#fff1bd' : '#ffffff');
     shard.material.opacity = isActive ? 1 : 0.96;
+    if (shard.material.emissive) {
+      shard.material.emissive.set(isActive ? '#264421' : shard.mesh.userData.materialType === 'video' ? '#113012' : '#0f1c32');
+      shard.material.emissiveIntensity = isActive ? 0.42 : shard.mesh.userData.materialType === 'video' ? 0.24 : 0.14;
+    }
   });
 
   window.SM.activeShardId = shardId;
@@ -187,7 +327,11 @@ async function swapTo(shardId, animate = true) {
     materialType: activeShard?.mesh?.userData?.materialType ?? 'image',
     projection: activeShard?.mesh?.userData?.projection ?? 'flat',
     distortionProfile: activeShard?.mesh?.userData?.distortionProfile ?? 'sphere-generic',
+    slotIndex: activeShard?.mesh?.userData?.slotIndex ?? 0,
+    repeated: activeShard?.mesh?.userData?.repeated ?? false,
   });
+
+  await syncVideoPlayback();
 
   if (animate) {
     window.SM.modules.render3d.shardMesh?.rotateBy?.(0.06, -0.04);
@@ -199,28 +343,40 @@ async function resetView() {
   shards.forEach((shard) => {
     shard.material.color = new THREE.Color('#ffffff');
     shard.material.opacity = 0.98;
+    if (shard.material.emissive) {
+      shard.material.emissive.set(shard.mesh.userData.materialType === 'video' ? '#113012' : '#0f1c32');
+      shard.material.emissiveIntensity = shard.mesh.userData.materialType === 'video' ? 0.24 : 0.14;
+    }
   });
   window.SM.activeShardId = null;
   window.SM.modules.render3d?.shardSeam?.setColor?.(null);
   window.SM.bus.emit('shard:blur', {});
+  await syncVideoPlayback();
 }
 
 function init() {
   offReady = window.SM?.bus?.once?.('app:ready', refreshBindings) ?? null;
   offMaterials = window.SM?.bus?.on?.('materials:updated', refreshBindings) ?? null;
   offShards = window.SM?.bus?.on?.('shards:rebuilt', refreshBindings) ?? null;
+  offState = window.SM?.bus?.on?.('state:change', () => {
+    void syncVideoPlayback();
+  }) ?? null;
 }
 
 function destroy() {
   offReady?.();
   offMaterials?.();
   offShards?.();
+  offState?.();
   offReady = null;
   offMaterials = null;
   offShards = null;
+  offState = null;
+  clearQueueTimer();
+  bindVersion += 1;
 
   Array.from(mediaCache.keys()).forEach((url) => {
-    disposeResource(url);
+    void disposeResource(url);
   });
 }
 

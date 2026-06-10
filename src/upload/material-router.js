@@ -5,8 +5,8 @@ const PRESET_MATERIALS = [
     id: 'preset-seaside',
     type: 'image',
     name: 'Seaside Golden Hour',
-    url: './assets/fallback/travel-media/travel-01-seaside.png',
-    mimeType: 'image/png',
+    url: './assets/fallback/travel-media/travel-01-seaside.webp',
+    mimeType: 'image/webp',
     isPanorama: false,
     projection: 'flat',
     distortionProfile: 'sphere-crop',
@@ -16,8 +16,8 @@ const PRESET_MATERIALS = [
     id: 'preset-mountain-road',
     type: 'image',
     name: 'Mountain Road Sunrise',
-    url: './assets/fallback/travel-media/travel-02-mountain-road.png',
-    mimeType: 'image/png',
+    url: './assets/fallback/travel-media/travel-02-mountain-road.webp',
+    mimeType: 'image/webp',
     isPanorama: false,
     projection: 'flat',
     distortionProfile: 'sphere-crop',
@@ -27,8 +27,8 @@ const PRESET_MATERIALS = [
     id: 'preset-lakeside-camp',
     type: 'image',
     name: 'Lakeside Camp Blue Hour',
-    url: './assets/fallback/travel-media/travel-03-lakeside-camp.png',
-    mimeType: 'image/png',
+    url: './assets/fallback/travel-media/travel-03-lakeside-camp.webp',
+    mimeType: 'image/webp',
     isPanorama: false,
     projection: 'flat',
     distortionProfile: 'sphere-crop',
@@ -38,8 +38,8 @@ const PRESET_MATERIALS = [
     id: 'preset-city-night',
     type: 'image',
     name: 'City Skyline Night View',
-    url: './assets/fallback/travel-media/travel-04-city-night.png',
-    mimeType: 'image/png',
+    url: './assets/fallback/travel-media/travel-04-city-night.webp',
+    mimeType: 'image/webp',
     isPanorama: false,
     projection: 'flat',
     distortionProfile: 'sphere-crop',
@@ -71,8 +71,8 @@ const PRESET_MATERIALS = [
     id: 'preset-desert-drive',
     type: 'image',
     name: 'Desert Drive Sunset',
-    url: './assets/fallback/travel-media/travel-07-desert-drive.png',
-    mimeType: 'image/png',
+    url: './assets/fallback/travel-media/travel-07-desert-drive.webp',
+    mimeType: 'image/webp',
     isPanorama: false,
     projection: 'flat',
     distortionProfile: 'sphere-crop',
@@ -82,8 +82,8 @@ const PRESET_MATERIALS = [
     id: 'preset-island-pier',
     type: 'image',
     name: 'Island Pier Morning',
-    url: './assets/fallback/travel-media/travel-08-island-pier.png',
-    mimeType: 'image/png',
+    url: './assets/fallback/travel-media/travel-08-island-pier.webp',
+    mimeType: 'image/webp',
     isPanorama: false,
     projection: 'flat',
     distortionProfile: 'sphere-crop',
@@ -146,6 +146,10 @@ function revokeUserObjectUrls() {
   objectUrls = [];
 }
 
+function getUserMaterials() {
+  return (window.SM.materials ?? []).filter((item) => !item.isPreset);
+}
+
 function inferProjection(file) {
   const name = file.name.toLowerCase();
   const mimeType = file.type.toLowerCase();
@@ -183,14 +187,14 @@ function inferProjection(file) {
   };
 }
 
-function createUserMaterials(files) {
+function createUserMaterials(files, startIndex = 0) {
   return files.map((file, index) => {
     const url = URL.createObjectURL(file);
     objectUrls.push(url);
     const profile = inferProjection(file);
 
     return {
-      id: `upload-${Date.now()}-${index}`,
+      id: `upload-${Date.now()}-${startIndex + index}`,
       type: file.type.startsWith('video/') ? 'video' : 'image',
       name: file.name,
       file,
@@ -206,8 +210,17 @@ function hydrateFromFiles(fileList) {
   const files = Array.from(fileList ?? []).filter((file) => file.type.startsWith('image/') || file.type.startsWith('video/'));
   if (!files.length) return applyMaterials(PRESET_MATERIALS);
 
-  revokeUserObjectUrls();
-  const materials = createUserMaterials(files);
+  const existingUserMaterials = getUserMaterials();
+  const shouldAppend = existingUserMaterials.length > 0;
+
+  if (!shouldAppend) {
+    revokeUserObjectUrls();
+  }
+
+  const materials = shouldAppend
+    ? [...existingUserMaterials, ...createUserMaterials(files, existingUserMaterials.length)]
+    : createUserMaterials(files);
+
   return applyMaterials(materials);
 }
 

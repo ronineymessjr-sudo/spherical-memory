@@ -6,16 +6,21 @@ function updateMirrorCopy() {
   const countEl = document.getElementById('mirror-hit-count');
   const hintEl = document.getElementById('mirror-hint');
   const stageEl = document.getElementById('mirror-stage-label');
-  if (!countEl || !hintEl) return;
+  const barEl = document.getElementById('mirror-progress-bar');
+  const steps = Array.from(document.querySelectorAll('.mirror-step'));
+  if (!countEl || !hintEl || !stageEl || !barEl) return;
 
-  countEl.textContent = `${tapCount} / 3 taps`;
-  if (stageEl) {
-    stageEl.textContent = tapCount >= 3 ? 'Phase 03 · Release' : `Phase 0${tapCount + 1} · Charge`;
-  }
+  countEl.textContent = `${tapCount} / 3 hits`;
+  stageEl.textContent = tapCount >= 3 ? 'Phase 03 - Release' : `Phase 0${tapCount + 1} - Charge`;
+  barEl.style.setProperty('--progress', `${(tapCount / 3) * 100}%`);
+  steps.forEach((step, index) => {
+    step.dataset.active = index < tapCount ? '1' : '0';
+  });
+
   hintEl.textContent = tapCount >= 3
-    ? 'Shattering...'
+    ? 'The mirror is releasing the shard cloud...'
     : tapCount === 2
-      ? 'One more hit to fracture the memory.'
+      ? 'One more hit and the sphere will rebuild itself.'
       : 'Tap the mirror three times to unlock the memory sphere.';
 }
 
@@ -34,19 +39,21 @@ function render() {
     <section class="mirror-screen">
       <div class="mirror-copy">
         <p class="eyebrow">MEMORY MIRROR</p>
-        <h2>Tap to fracture the reflection</h2>
+        <h2>Break the reflection and release the travel archive.</h2>
         <p id="mirror-stage-label" class="mirror-stage-label"></p>
         <p id="mirror-hint" class="mirror-hint"></p>
+        <div id="mirror-progress-bar" class="mirror-progress-bar"></div>
         <p id="mirror-hit-count" class="mirror-count"></p>
         <div class="mirror-steps">
-          <span>1. Charge the mirror</span>
-          <span>2. Trigger the fracture</span>
-          <span>3. Rebuild the sphere</span>
+          <span class="mirror-step" data-active="0">1. Charge</span>
+          <span class="mirror-step" data-active="0">2. Fracture</span>
+          <span class="mirror-step" data-active="0">3. Aggregate</span>
         </div>
       </div>
       <div class="mirror-stage">
         <div class="mirror-frame">
           <div class="mirror-surface">
+            <div class="mirror-reflection"></div>
             <div id="mirror-crack-overlay" class="mirror-crack-overlay"></div>
           </div>
         </div>

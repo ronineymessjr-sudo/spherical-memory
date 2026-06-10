@@ -12,25 +12,36 @@ function render() {
       <div class="cover-glow"></div>
       <div class="cover-card">
         <p class="eyebrow">SPHERICAL MEMORY</p>
-        <h1>Turn uploads into a<br>living memory sphere.</h1>
+        <h1>Fold travel photos and video into a living memory sphere.</h1>
         <p class="cover-copy">
-          Upload any number of images, fracture the mirror, and rebuild them into a rotating archive of shards that can be explored, focused, and captured.
+          Upload any number of images, videos, or panoramas. After the mirror fractures, every file gets redistributed across a rotating sphere of shards you can orbit, zoom, focus, and capture.
         </p>
+        <div class="cover-preview-grid">
+          <article class="cover-preview-card" style="background-image:linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.58)), url('./assets/fallback/travel-media/travel-01-seaside.webp')">
+            <span>Seaside dusk</span>
+          </article>
+          <article class="cover-preview-card" style="background-image:linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.58)), url('./assets/fallback/travel-media/travel-04-city-night.webp')">
+            <span>City after dark</span>
+          </article>
+          <article class="cover-preview-card" style="background-image:linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.58)), url('./assets/fallback/travel-media/travel-08-island-pier.webp')">
+            <span>Island morning</span>
+          </article>
+        </div>
         <div class="cover-stats">
           <div class="cover-stat">
-            <strong>Flexible inputs</strong>
-            <span>PNG, JPG, WebP, MP4, panorama-ready</span>
+            <strong>Unlimited uploads</strong>
+            <span>Keep adding new media and let shard count grow with the library</span>
           </div>
           <div class="cover-stat">
-            <strong>Dynamic shards</strong>
-            <span>Uploads decide the fragment count</span>
+            <strong>Mixed mapping</strong>
+            <span>Flat frames crop by shard while panorama names auto-wrap to the sphere</span>
           </div>
           <div class="cover-stat">
-            <strong>Touch-first</strong>
-            <span>Drag, pinch, randomize, capture</span>
+            <strong>Touch-first control</strong>
+            <span>Drag, pinch, shuffle, autoplay, and capture are wired end to end</span>
           </div>
         </div>
-        <button id="enter-memory-button" class="primary-cta" type="button">Tap to enter</button>
+        <button id="enter-memory-button" class="primary-cta" type="button">Enter the sphere</button>
       </div>
     </section>
   `;

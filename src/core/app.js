@@ -25,7 +25,7 @@ window.SM = {
 
 const SM = window.SM;
 
-const INIT_SEQUENCE = [
+const CORE_SEQUENCE = [
   ['render3d', 'scene', () => import('../render3d/scene.js')],
   ['render3d', 'sphereShell', () => import('../render3d/sphere-shell.js')],
   ['render3d', 'shardMesh', () => import('../render3d/shard-mesh.js')],
@@ -41,10 +41,13 @@ const INIT_SEQUENCE = [
   ['ui', 'cover', () => import('../ui/cover.js')],
   ['ui', 'mirror', () => import('../ui/mirror.js')],
   ['ui', 'hud', () => import('../ui/hud.js')],
+  ['demo', 'mode', () => import('../demo/mode.js')],
+];
+
+const DEFERRED_SEQUENCE = [
   ['output', 'screenshot', () => import('../output/screenshot.js')],
   ['output', 'share', () => import('../output/share.js')],
   ['audio', 'soundFx', () => import('../audio/sound-fx.js')],
-  ['demo', 'mode', () => import('../demo/mode.js')],
 ];
 
 function detectWebGL() {
@@ -87,8 +90,8 @@ function bindInputTargets() {
   });
 }
 
-async function loadModules() {
-  for (const [category, name, loader] of INIT_SEQUENCE) {
+async function loadModules(sequence) {
+  for (const [category, name, loader] of sequence) {
     try {
       const mod = await loader();
       if (!SM.modules[category]) SM.modules[category] = {};
@@ -99,6 +102,28 @@ async function loadModules() {
       console.warn(`[SM] skip ${category}.${name}:`, error?.message || error);
     }
   }
+}
+
+function queueDeferredModules() {
+  const loadDeferred = async () => {
+    await loadModules(DEFERRED_SEQUENCE);
+    SM.bus.emit('app:deferred-ready');
+  };
+
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(() => {
+      loadDeferred().catch((error) => {
+        console.warn('[SM] deferred init failed:', error?.message || error);
+      });
+    }, { timeout: 1200 });
+    return;
+  }
+
+  window.setTimeout(() => {
+    loadDeferred().catch((error) => {
+      console.warn('[SM] deferred init failed:', error?.message || error);
+    });
+  }, 180);
 }
 
 async function loadFallbackIfNeeded() {
@@ -130,8 +155,9 @@ async function init() {
   });
 
   bindInputTargets();
-  await loadModules();
+  await loadModules(CORE_SEQUENCE);
   await loadFallbackIfNeeded();
+  queueDeferredModules();
 
   if (SM.debug) {
     console.log('%c[SM] debug mode enabled: try SM.go("sphere")', 'color:#ffaa00');

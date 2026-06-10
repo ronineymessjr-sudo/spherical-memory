@@ -16,15 +16,29 @@ function getDesiredShardCount() {
 }
 
 function getWidthSegments(totalCount) {
-  return totalCount > 18 ? 10 : totalCount > 12 ? 14 : 18;
+  if (totalCount > 24) return 8;
+  if (totalCount > 16) return 10;
+  if (totalCount > 10) return 12;
+  return 16;
 }
 
-function createMaterial(index) {
-  return new THREE.MeshBasicMaterial({
+function getHeightSegments(totalCount) {
+  if (totalCount > 24) return 12;
+  if (totalCount > 16) return 14;
+  if (totalCount > 10) return 18;
+  return 22;
+}
+
+function createMaterial() {
+  return new THREE.MeshStandardMaterial({
     color: new THREE.Color('#ffffff'),
     transparent: true,
     opacity: 0.98,
     side: THREE.DoubleSide,
+    roughness: 0.42,
+    metalness: 0.08,
+    emissive: new THREE.Color('#0f1c32'),
+    emissiveIntensity: 0.14,
   });
 }
 
@@ -34,22 +48,22 @@ function createShard(index, totalCount) {
   const geometry = new THREE.SphereGeometry(
     RADIUS,
     getWidthSegments(totalCount),
-    22,
+    getHeightSegments(totalCount),
     phiStart,
     phiLength,
-    0.12,
-    Math.PI - 0.24,
+    0.1,
+    Math.PI - 0.2,
   );
-  const material = createMaterial(index);
+  const material = createMaterial();
   const mesh = new THREE.Mesh(geometry, material);
   const midPhi = phiStart + phiLength / 2;
-  const verticalBias = ((index % 4) - 1.5) * 0.12;
+  const verticalBias = Math.sin((index / Math.max(totalCount - 1, 1)) * Math.PI) * 0.18 - 0.09;
   const direction = new THREE.Vector3(
     Math.cos(midPhi),
     verticalBias,
     Math.sin(midPhi),
   ).normalize();
-  const explodedPosition = direction.clone().multiplyScalar(2.1 + (index % 3) * 0.16);
+  const explodedPosition = direction.clone().multiplyScalar(2.08 + (index % 3) * 0.14);
 
   return {
     id: `shard-${index}`,
@@ -96,6 +110,7 @@ function rebuildShards(forceCount = getDesiredShardCount()) {
   shardRecords = Array.from({ length: forceCount }, (_, index) => createShard(index, forceCount));
   shardRecords.forEach((record) => {
     record.mesh.position.copy(record.explodedPosition);
+    record.mesh.renderOrder = 2;
     record.mesh.userData.shardId = record.id;
     group.add(record.mesh);
   });

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as materialRouter from '../src/upload/material-router.js';
 
 describe('material-router', () => {
@@ -8,6 +8,8 @@ describe('material-router', () => {
       materialAssignments: [],
       bus: { emit() {} },
     };
+    globalThis.URL.createObjectURL = vi.fn((file) => `blob:${file.name}`);
+    globalThis.URL.revokeObjectURL = vi.fn();
   });
 
   it('hydrates preset demo materials when none exist', () => {
@@ -15,7 +17,7 @@ describe('material-router', () => {
 
     expect(window.SM.materials).toHaveLength(8);
     expect(window.SM.materialAssignments).toHaveLength(8);
-    expect(window.SM.materials[0].url).toContain('assets/fallback/travel-media/travel-01-seaside.png');
+    expect(window.SM.materials[0].url).toContain('assets/fallback/travel-media/travel-01-seaside.webp');
     expect(window.SM.materials.some((item) => item.type === 'video')).toBe(true);
   });
 
@@ -56,5 +58,34 @@ describe('material-router', () => {
     expect(video.distortionProfile).toBe('sphere-video-crop');
     expect(panoVideo.projection).toBe('panorama');
     expect(panoVideo.distortionProfile).toBe('sphere-video-equirect');
+  });
+
+  it('replaces preset assets with uploaded media and pads to six shards', () => {
+    const files = [
+      new File(['image'], 'family-trip.jpg', { type: 'image/jpeg' }),
+      new File(['video'], 'night-drive.mp4', { type: 'video/mp4' }),
+    ];
+
+    materialRouter.hydrateFromFiles(files);
+
+    expect(window.SM.materials).toHaveLength(2);
+    expect(window.SM.materialAssignments).toHaveLength(6);
+    expect(window.SM.materials.map((item) => item.type)).toEqual(['image', 'video']);
+    expect(window.SM.materialAssignments.some((item) => item.repeated)).toBe(true);
+  });
+
+  it('appends additional uploads onto existing user media', () => {
+    materialRouter.hydrateFromFiles([
+      new File(['image'], 'one.jpg', { type: 'image/jpeg' }),
+    ]);
+
+    materialRouter.hydrateFromFiles([
+      new File(['image'], 'two.png', { type: 'image/png' }),
+      new File(['video'], 'three.mp4', { type: 'video/mp4' }),
+    ]);
+
+    expect(window.SM.materials).toHaveLength(3);
+    expect(window.SM.materials.map((item) => item.name)).toEqual(['one.jpg', 'two.png', 'three.mp4']);
+    expect(window.SM.materialAssignments).toHaveLength(6);
   });
 });

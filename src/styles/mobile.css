@@ -1,11 +1,12 @@
-@media (max-width: 768px) {
-  body {
-    font-size: 14px;
-  }
-
+@media (max-width: 900px) {
   .cover-screen,
   .mirror-screen {
-    padding: 18px;
+    padding: 22px 18px;
+  }
+
+  .cover-preview-grid,
+  .cover-stats {
+    grid-template-columns: 1fr;
   }
 
   .mirror-screen {
@@ -17,8 +18,8 @@
     text-align: center;
   }
 
-  .cover-stats {
-    grid-template-columns: 1fr;
+  .mirror-progress-bar {
+    margin-inline: auto;
   }
 
   .mirror-steps {
@@ -26,12 +27,19 @@
   }
 
   .mirror-frame {
-    width: min(84vw, 360px);
+    width: min(88vw, 390px);
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
   }
 
   #hud-container {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
     right: 12px;
+    left: 12px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   }
 
   #upload-container {
@@ -41,24 +49,30 @@
     max-width: none;
   }
 
-  .upload-panel {
+  .hud-stack {
+    width: 100%;
+  }
+
+  .upload-panel,
+  .hud-card {
     min-width: 0;
   }
 
-  .hud-stack {
-    max-width: min(280px, calc(100vw - 24px));
+  .upload-actions {
+    grid-template-columns: 1fr;
   }
 }
 
-@media (orientation: landscape) and (max-height: 500px) {
-  /* 横屏手机适配：缩小标题字体 */
+@media (orientation: landscape) and (max-height: 540px) {
   body {
     font-size: 13px;
   }
-}
 
-/* 防止 iOS Safari 弹性滚动 */
-html, body {
-  position: fixed;
-  overscroll-behavior: none;
+  .cover-card h1 {
+    font-size: clamp(2.4rem, 5vw, 4rem);
+  }
+
+  .cover-preview-card {
+    min-height: 112px;
+  }
 }

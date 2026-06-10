@@ -14,6 +14,10 @@ function contentType(filePath) {
   if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) return 'text/javascript; charset=utf-8';
   if (filePath.endsWith('.css')) return 'text/css; charset=utf-8';
   if (filePath.endsWith('.svg')) return 'image/svg+xml';
+  if (filePath.endsWith('.png')) return 'image/png';
+  if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) return 'image/jpeg';
+  if (filePath.endsWith('.webp')) return 'image/webp';
+  if (filePath.endsWith('.mp4')) return 'video/mp4';
   if (filePath.endsWith('.json')) return 'application/json; charset=utf-8';
   return 'application/octet-stream';
 }
@@ -79,6 +83,66 @@ async function runSmoke() {
   });
 
   try {
+    const uploadPage = await browser.newPage();
+    const uploadErrors = [];
+    const failedUploadRequests = [];
+    uploadPage.on('console', (msg) => {
+      if (msg.type() === 'error') {
+        uploadErrors.push(msg.text());
+      }
+    });
+    uploadPage.on('pageerror', (error) => {
+      uploadErrors.push(error.message);
+    });
+    uploadPage.on('response', (response) => {
+      if (response.status() >= 400) {
+        failedUploadRequests.push(`${response.status()} ${response.url()}`);
+      }
+    });
+
+    await uploadPage.goto(`http://${host}:${port}/`, { waitUntil: 'networkidle2' });
+    await uploadPage.waitForSelector('#upload-images', { timeout: 5000 });
+    const uploadInput = await uploadPage.$('#upload-images');
+    await uploadInput.uploadFile(
+      path.join(rootDir, 'assets', 'fallback', 'travel-media', 'travel-01-seaside.webp'),
+      path.join(rootDir, 'assets', 'fallback', 'travel-media', 'travel-05-seaside-loop.mp4'),
+    );
+
+    await uploadPage.waitForFunction(() => {
+      return window.SM?.materials?.length === 2 && window.SM?.materialAssignments?.length === 6;
+    }, { timeout: 10000 });
+
+    await uploadPage.evaluate(() => {
+      window.SM.go('mirror');
+      const tap = () => window.SM.bus.emit('input:tap', {
+        target: 'mirror',
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      });
+      tap();
+      tap();
+      tap();
+    });
+
+    await uploadPage.waitForFunction(() => window.SM?.currentState === 'sphere', { timeout: 15000 });
+    await uploadPage.waitForFunction(() => {
+      return window.SM?.modules?.render3d?.shardMesh?.getShards?.()
+        ?.some((shard) => shard.mesh.userData.materialType === 'video');
+    }, { timeout: 10000 });
+
+    const uploadSnapshot = await uploadPage.evaluate(() => ({
+      summary: document.querySelector('#upload-summary')?.textContent || '',
+      focus: document.querySelector('#hud-library-detail')?.textContent || '',
+      hasVideo: window.SM.materials.some((item) => item.type === 'video'),
+    }));
+
+    const blockingUploadRequests = failedUploadRequests.filter((entry) => !entry.endsWith('/favicon.ico'));
+    if (uploadErrors.length || blockingUploadRequests.length || !uploadSnapshot.hasVideo) {
+      throw new Error(
+        `Smoke issues on upload route:\n${uploadErrors.join('\n')}\n${blockingUploadRequests.join('\n')}\n${JSON.stringify(uploadSnapshot)}`.trim(),
+      );
+    }
+
     const page = await browser.newPage();
     const consoleErrors = [];
     const failedRequests = [];

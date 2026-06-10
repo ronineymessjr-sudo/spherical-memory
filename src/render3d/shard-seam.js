@@ -3,6 +3,8 @@ import * as THREE from 'three';
 let seamGroup = null;
 let offRebuild = null;
 let syncFrame = 0;
+let activeShardId = null;
+let pulsePhase = 0;
 
 function ensureGroup() {
   if (seamGroup) return seamGroup;
@@ -38,24 +40,35 @@ function rebuild() {
     const material = new THREE.LineBasicMaterial({
       color: '#7bcfff',
       transparent: true,
-      opacity: 0.48,
+      opacity: 0.46,
+      blending: THREE.AdditiveBlending,
     });
     const lines = new THREE.LineSegments(geometry, material);
     lines.position.copy(record.mesh.position);
     lines.rotation.copy(record.mesh.rotation);
+    lines.scale.setScalar(1.0025);
     lines.userData.shardId = record.id;
-    seamGroup.add(lines);
+    group.add(lines);
   });
+
+  setColor(activeShardId);
 }
 
 function sync() {
   if (!seamGroup) return;
+  pulsePhase += 0.035;
   const shards = window.SM.modules.render3d?.shardMesh?.getShards?.() ?? [];
+
   seamGroup.children.forEach((line) => {
     const shard = shards.find((record) => record.id === line.userData.shardId);
     if (!shard) return;
+
+    const isActive = !!activeShardId && line.userData.shardId === activeShardId;
     line.position.copy(shard.mesh.position);
     line.rotation.copy(shard.mesh.rotation);
+    line.material.opacity = isActive
+      ? 0.78 + Math.sin(pulsePhase) * 0.12
+      : 0.34 + Math.sin(pulsePhase + shard.index * 0.45) * 0.06;
   });
 }
 
@@ -63,12 +76,14 @@ function setEnabled(visible = true) {
   if (seamGroup) seamGroup.visible = visible;
 }
 
-function setColor(activeShardId) {
+function setColor(nextActiveShardId) {
+  activeShardId = nextActiveShardId;
   if (!seamGroup) return;
+
   seamGroup.children.forEach((line) => {
     const isActive = activeShardId && line.userData.shardId === activeShardId;
     line.material.color.set(isActive ? '#ffe28f' : '#7bcfff');
-    line.material.opacity = isActive ? 0.95 : 0.48;
+    line.material.opacity = isActive ? 0.9 : 0.42;
   });
 }
 
@@ -96,6 +111,8 @@ function destroy() {
   clearSeams();
   seamGroup?.parent?.remove?.(seamGroup);
   seamGroup = null;
+  activeShardId = null;
+  pulsePhase = 0;
 }
 
 export {
