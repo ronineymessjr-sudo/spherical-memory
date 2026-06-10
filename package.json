@@ -1,0 +1,21 @@
+{
+  "name": "spherical-memory",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "H5 MVP for the spherical-memory demo experience",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "vitest run",
+    "smoke": "node scripts/smoke.mjs",
+    "verify": "npm run build && npm run test && npm run smoke"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "puppeteer-core": "^24.10.2",
+    "vitest": "^3.2.4"
+  }
+}

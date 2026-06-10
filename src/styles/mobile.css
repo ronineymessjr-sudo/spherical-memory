@@ -1,0 +1,46 @@
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+
+  .cover-screen,
+  .mirror-screen {
+    padding: 18px;
+  }
+
+  .mirror-screen {
+    grid-template-columns: 1fr;
+    align-content: center;
+  }
+
+  .mirror-copy {
+    text-align: center;
+  }
+
+  .mirror-frame {
+    width: min(84vw, 360px);
+  }
+
+  #hud-container {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    right: 12px;
+  }
+
+  #upload-container {
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: 12px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  /* 横屏手机适配：缩小标题字体 */
+  body {
+    font-size: 13px;
+  }
+}
+
+/* 防止 iOS Safari 弹性滚动 */
+html, body {
+  position: fixed;
+  overscroll-behavior: none;
+}

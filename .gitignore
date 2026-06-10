@@ -1,0 +1,29 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Build outputs (未来如果加打包)
+dist/
+build/
+node_modules/
+
+# Backups
+*.bak
+*.tmp
