@@ -51,6 +51,7 @@ html, body {
   top: 16px;
   z-index: 100;
   display: none;
+  max-width: min(320px, calc(100vw - 32px));
 }
 
 /* HUD 在 sphere 态显示 */
@@ -60,7 +61,9 @@ body[data-state="share"] #hud-container {
 }
 
 body[data-state="cover"] #upload-container,
-body[data-state="mirror"] #upload-container {
+body[data-state="mirror"] #upload-container,
+body[data-state="sphere"] #upload-container,
+body[data-state="share"] #upload-container {
   display: block;
 }
 
@@ -71,6 +74,7 @@ body::before {
   background:
     radial-gradient(circle at 20% 20%, rgba(108, 149, 255, 0.22), transparent 32%),
     radial-gradient(circle at 80% 18%, rgba(255, 133, 196, 0.18), transparent 28%),
+    radial-gradient(circle at 50% 70%, rgba(72, 190, 255, 0.12), transparent 34%),
     linear-gradient(180deg, #17122b 0%, #0f0b1d 100%);
   z-index: -2;
 }
@@ -112,6 +116,8 @@ body::after {
 .cover-card h1 {
   font-size: clamp(2.8rem, 8vw, 5.6rem);
   margin-bottom: 18px;
+  max-width: 10ch;
+  margin-inline: auto;
 }
 
 .mirror-copy h2 {
@@ -141,6 +147,42 @@ body::after {
   margin: 0 auto 28px;
   font-size: clamp(1rem, 2.4vw, 1.18rem);
   line-height: 1.65;
+}
+
+.cover-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 auto 28px;
+  width: min(720px, 100%);
+}
+
+.cover-stat,
+.mirror-steps span,
+.upload-badges span,
+.hud-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(13, 16, 32, 0.48);
+  backdrop-filter: blur(16px);
+}
+
+.cover-stat {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  text-align: left;
+}
+
+.cover-stat strong {
+  font-size: 0.88rem;
+  color: #eff6ff;
+}
+
+.cover-stat span {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: rgba(235, 240, 255, 0.76);
 }
 
 .primary-cta,
@@ -177,6 +219,25 @@ body::after {
   animation: pulse-glow 4.8s ease-in-out infinite;
 }
 
+.cover-orbit {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: min(72vw, 760px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(127, 202, 255, 0.22);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 30px rgba(76, 161, 255, 0.16));
+}
+
+.cover-orbit.orbit-a {
+  transform: translate(-50%, -50%) rotateX(70deg) rotateZ(10deg);
+}
+
+.cover-orbit.orbit-b {
+  transform: translate(-50%, -50%) rotateY(72deg) rotateZ(-16deg);
+}
+
 .mirror-screen {
   grid-template-columns: minmax(280px, 420px) minmax(280px, 520px);
   gap: clamp(20px, 4vw, 48px);
@@ -184,6 +245,17 @@ body::after {
 
 .mirror-copy {
   text-align: left;
+}
+
+.mirror-stage-label {
+  display: inline-flex;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: rgba(143, 214, 255, 0.12);
+  border: 1px solid rgba(143, 214, 255, 0.18);
+  color: #bde5ff;
+  font-size: 0.84rem;
 }
 
 .mirror-stage {
@@ -229,6 +301,8 @@ body::after {
   inset: 0;
   opacity: 0;
   background:
+    radial-gradient(circle at 50% 46%, rgba(255, 255, 255, 0.2), transparent 12%),
+    conic-gradient(from 0deg at 50% 46%, transparent 0deg 24deg, rgba(255,255,255,0.62) 25deg 27deg, transparent 28deg 48deg, rgba(143,214,255,0.55) 49deg 52deg, transparent 53deg 78deg, rgba(255,171,214,0.45) 79deg 82deg, transparent 83deg 360deg),
     linear-gradient(110deg, transparent 46%, rgba(255, 255, 255, 0.64) 49%, transparent 52%),
     linear-gradient(70deg, transparent 44%, rgba(143, 214, 255, 0.45) 48%, transparent 52%),
     linear-gradient(18deg, transparent 50%, rgba(255, 171, 214, 0.34) 52%, transparent 54%),
@@ -262,27 +336,131 @@ body::after {
   color: #9ec3ff;
 }
 
-.hud-panel,
-.upload-hint {
+.mirror-steps {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.mirror-steps span {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  color: rgba(238, 246, 255, 0.8);
+}
+
+.hud-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hud-card,
+.upload-panel {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 14px;
-  min-width: 180px;
+  min-width: 220px;
   border-radius: 22px;
   background: rgba(15, 19, 34, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(18px);
 }
 
-.upload-hint strong {
-  font-size: 0.92rem;
+.hud-label {
+  color: #9ec3ff;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.72rem;
 }
 
-.upload-hint span {
+.hud-focus-card strong {
+  font-size: 1rem;
+  color: #f5fbff;
+}
+
+.hud-focus-card p:last-child {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: rgba(235, 240, 255, 0.76);
+}
+
+.upload-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.upload-copy strong {
+  font-size: 0.96rem;
+}
+
+.upload-copy span {
+  font-size: 0.8rem;
+  color: #9ec3ff;
+}
+
+.upload-copy p {
   font-size: 0.82rem;
   line-height: 1.45;
   color: rgba(235, 240, 255, 0.76);
+}
+
+.upload-format-summary {
+  color: #b7dfff;
+}
+
+.upload-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.upload-badges span {
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  color: rgba(240, 246, 255, 0.86);
+}
+
+.upload-picker,
+.upload-button {
+  min-height: 44px;
+  border-radius: 16px;
+}
+
+.upload-picker {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 12px 16px;
+  color: #0d1020;
+  background: linear-gradient(135deg, #dff5ff 0%, #8fd6ff 100%);
+  box-shadow: 0 16px 44px rgba(66, 146, 255, 0.22);
+  cursor: pointer;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.upload-picker input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-button {
+  border: 0;
+  cursor: pointer;
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ecf2ff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.upload-button.alt {
+  background: rgba(143, 214, 255, 0.18);
 }
 
 .hud-button {

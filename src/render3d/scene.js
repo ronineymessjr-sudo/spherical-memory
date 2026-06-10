@@ -6,6 +6,7 @@ let scene = null;
 let rootGroup = null;
 let animationFrame = 0;
 let resizeHandler = null;
+let cameraDistance = 4.6;
 
 function init() {
   if (scene) return;
@@ -25,7 +26,7 @@ function init() {
   scene.fog = new THREE.Fog('#120f24', 4, 12);
 
   camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 0, 4.6);
+  camera.position.set(0, 0, cameraDistance);
 
   const ambient = new THREE.AmbientLight('#ffffff', 1.6);
   const key = new THREE.DirectionalLight('#89d5ff', 2.2);
@@ -55,6 +56,18 @@ function init() {
   loop();
 }
 
+function setCameraDistance(nextDistance) {
+  if (!camera) return;
+  cameraDistance = THREE.MathUtils.clamp(nextDistance, 2.6, 7.8);
+  camera.position.z = cameraDistance;
+  window.SM.cameraDistance = cameraDistance;
+}
+
+function dollyBy(scaleDelta) {
+  if (!camera || !scaleDelta || Number.isNaN(scaleDelta)) return;
+  setCameraDistance(cameraDistance / scaleDelta);
+}
+
 function destroy() {
   if (animationFrame) {
     window.cancelAnimationFrame(animationFrame);
@@ -77,6 +90,7 @@ function destroy() {
   camera = null;
   scene = null;
   rootGroup = null;
+  cameraDistance = 4.6;
 }
 
 function getRenderer() {
@@ -113,4 +127,6 @@ export {
   getRootGroup,
   setQuality,
   onResize,
+  setCameraDistance,
+  dollyBy,
 };

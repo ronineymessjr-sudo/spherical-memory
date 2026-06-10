@@ -7,13 +7,29 @@ function render() {
   container.dataset.ready = '1';
   container.innerHTML = `
     <section class="cover-screen">
+      <div class="cover-orbit orbit-a"></div>
+      <div class="cover-orbit orbit-b"></div>
       <div class="cover-glow"></div>
       <div class="cover-card">
         <p class="eyebrow">SPHERICAL MEMORY</p>
-        <h1>Break the mirror.<br>Rebuild the memory.</h1>
+        <h1>Turn uploads into a<br>living memory sphere.</h1>
         <p class="cover-copy">
-          Tap into a reflective memory sphere built from six vivid fragments.
+          Upload any number of images, fracture the mirror, and rebuild them into a rotating archive of shards that can be explored, focused, and captured.
         </p>
+        <div class="cover-stats">
+          <div class="cover-stat">
+            <strong>Flexible inputs</strong>
+            <span>PNG, JPG, WebP, MP4, panorama-ready</span>
+          </div>
+          <div class="cover-stat">
+            <strong>Dynamic shards</strong>
+            <span>Uploads decide the fragment count</span>
+          </div>
+          <div class="cover-stat">
+            <strong>Touch-first</strong>
+            <span>Drag, pinch, randomize, capture</span>
+          </div>
+        </div>
         <button id="enter-memory-button" class="primary-cta" type="button">Tap to enter</button>
       </div>
     </section>

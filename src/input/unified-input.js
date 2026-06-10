@@ -1,15 +1,14 @@
-// Unified Input - 鼠标/触摸/Pinch 统一为 5 类事件
-// 接口契约: docs/INTERFACES.md §4
-// Owner: A3 输入层工程师
 export class UnifiedInput {
   constructor(bus, target = document.body) {
     this.bus = bus;
     this.target = target;
     this.targets = new Map();
-    this._pointerId = null;
+    this._pointers = new Map();
+    this._primaryPointerId = null;
     this._down = null;
     this._isDragging = false;
-    this._lastPinchDist = 0;
+    this._isPinching = false;
+    this._lastPinchDistance = 0;
     this._bind();
   }
 
@@ -19,6 +18,7 @@ export class UnifiedInput {
     this.target.addEventListener('pointermove', this._onMove);
     this.target.addEventListener('pointerup', this._onUp);
     this.target.addEventListener('pointercancel', this._onUp);
+    this.target.addEventListener('wheel', this._onWheel, { passive: false });
   }
 
   bindTarget(el, name) {
@@ -43,38 +43,150 @@ export class UnifiedInput {
     return 'background';
   }
 
-  _onDown = (e) => {
-    if (this._pointerId !== null) return;
-    this._pointerId = e.pointerId;
-    this._down = { x: e.clientX, y: e.clientY };
+  _snapshotPointer(event) {
+    return {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+  }
+
+  _getPinchData() {
+    const [first, second] = Array.from(this._pointers.values());
+    if (!first || !second) return null;
+
+    const dx = second.x - first.x;
+    const dy = second.y - first.y;
+    const centerX = (first.x + second.x) / 2;
+    const centerY = (first.y + second.y) / 2;
+
+    return {
+      distance: Math.hypot(dx, dy),
+      centerX,
+      centerY,
+      target: this._resolveTarget(centerX, centerY),
+    };
+  }
+
+  _startPinch() {
+    const pinch = this._getPinchData();
+    if (!pinch) return;
+
+    this._isPinching = true;
     this._isDragging = false;
+    this._lastPinchDistance = pinch.distance;
+    this.bus.emit('input:pinch-start', {
+      x: pinch.centerX,
+      y: pinch.centerY,
+      distance: pinch.distance,
+      scaleDelta: 1,
+      target: pinch.target,
+    });
+  }
+
+  _onDown = (event) => {
+    this._pointers.set(event.pointerId, this._snapshotPointer(event));
+
+    if (this._pointers.size === 1) {
+      this._primaryPointerId = event.pointerId;
+      this._down = { x: event.clientX, y: event.clientY };
+      this._isDragging = false;
+      this._isPinching = false;
+      return;
+    }
+
+    if (this._pointers.size === 2) {
+      if (this._isDragging && this._down) {
+        this.bus.emit('input:drag-end', {
+          x: event.clientX,
+          y: event.clientY,
+          target: this._resolveTarget(this._down.x, this._down.y),
+        });
+      }
+      this._startPinch();
+    }
   };
 
-  _onMove = (e) => {
-    if (this._pointerId !== e.pointerId) return;
-    if (!this._down) return;
-    const dx = e.clientX - this._down.x;
-    const dy = e.clientY - this._down.y;
+  _onMove = (event) => {
+    if (!this._pointers.has(event.pointerId)) return;
+    this._pointers.set(event.pointerId, this._snapshotPointer(event));
+
+    if (this._isPinching && this._pointers.size >= 2) {
+      const pinch = this._getPinchData();
+      if (!pinch || !this._lastPinchDistance) return;
+
+      const scaleDelta = pinch.distance / this._lastPinchDistance;
+      this._lastPinchDistance = pinch.distance;
+      this.bus.emit('input:pinch', {
+        x: pinch.centerX,
+        y: pinch.centerY,
+        distance: pinch.distance,
+        scaleDelta,
+        target: pinch.target,
+      });
+      return;
+    }
+
+    if (this._primaryPointerId !== event.pointerId || !this._down) return;
+
+    const dx = event.clientX - this._down.x;
+    const dy = event.clientY - this._down.y;
     if (!this._isDragging && Math.hypot(dx, dy) < 5) return;
+
     if (!this._isDragging) {
       this._isDragging = true;
       const target = this._resolveTarget(this._down.x, this._down.y);
       this.bus.emit('input:drag-start', { x: this._down.x, y: this._down.y, target });
     }
+
     const target = this._resolveTarget(this._down.x, this._down.y);
-    this.bus.emit('input:drag', { x: e.clientX, y: e.clientY, dx, dy, target });
+    this.bus.emit('input:drag', { x: event.clientX, y: event.clientY, dx, dy, target });
   };
 
-  _onUp = (e) => {
-    if (this._pointerId !== e.pointerId) return;
-    const target = this._resolveTarget(this._down.x, this._down.y);
-    if (this._isDragging) {
-      this.bus.emit('input:drag-end', { x: e.clientX, y: e.clientY, target });
-    } else {
-      this.bus.emit('input:tap', { x: e.clientX, y: e.clientY, target });
+  _onUp = (event) => {
+    const snapshot = this._pointers.get(event.pointerId);
+    if (!snapshot) return;
+
+    const activePointers = this._pointers.size;
+    this._pointers.delete(event.pointerId);
+
+    if (this._isPinching && activePointers >= 2 && this._pointers.size < 2) {
+      const pinchTarget = this._resolveTarget(snapshot.x, snapshot.y);
+      this.bus.emit('input:pinch-end', {
+        x: snapshot.x,
+        y: snapshot.y,
+        target: pinchTarget,
+      });
+      this._isPinching = false;
+      this._lastPinchDistance = 0;
+      this._primaryPointerId = null;
+      this._down = null;
+      this._isDragging = false;
+      return;
     }
-    this._pointerId = null;
+
+    if (this._primaryPointerId !== event.pointerId) return;
+
+    const target = this._resolveTarget(this._down?.x ?? snapshot.x, this._down?.y ?? snapshot.y);
+    if (this._isDragging) {
+      this.bus.emit('input:drag-end', { x: event.clientX, y: event.clientY, target });
+    } else {
+      this.bus.emit('input:tap', { x: event.clientX, y: event.clientY, target });
+    }
+
+    this._primaryPointerId = null;
     this._down = null;
     this._isDragging = false;
+  };
+
+  _onWheel = (event) => {
+    const target = this._resolveTarget(event.clientX, event.clientY);
+    this.bus.emit('input:wheel', {
+      x: event.clientX,
+      y: event.clientY,
+      deltaY: event.deltaY,
+      target,
+    });
+    event.preventDefault();
   };
 }

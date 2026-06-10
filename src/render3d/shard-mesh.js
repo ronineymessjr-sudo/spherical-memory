@@ -1,38 +1,62 @@
 import * as THREE from 'three';
+import { MIN_SHARD_COUNT } from '../upload/material-router.js';
 
-const SHARD_COUNT = 6;
 const RADIUS = 1.45;
 
 let shardGroup = null;
 let shardRecords = [];
+let offMaterials = null;
+
+function getDesiredShardCount() {
+  return Math.max(
+    MIN_SHARD_COUNT,
+    window.SM?.materialAssignments?.length || 0,
+    window.SM?.materials?.length || 0,
+  );
+}
+
+function getWidthSegments(totalCount) {
+  return totalCount > 18 ? 10 : totalCount > 12 ? 14 : 18;
+}
 
 function createMaterial(index) {
-  return new THREE.MeshStandardMaterial({
-    color: new THREE.Color(`hsl(${205 + index * 18} 70% 68%)`),
-    roughness: 0.42,
-    metalness: 0.08,
+  return new THREE.MeshBasicMaterial({
+    color: new THREE.Color('#ffffff'),
     transparent: true,
-    opacity: 1,
+    opacity: 0.98,
+    side: THREE.DoubleSide,
   });
 }
 
-function createShard(index) {
-  const phiLength = (Math.PI * 2) / SHARD_COUNT;
+function createShard(index, totalCount) {
+  const phiLength = (Math.PI * 2) / totalCount;
   const phiStart = index * phiLength;
-  const geometry = new THREE.SphereGeometry(RADIUS, 32, 24, phiStart, phiLength, 0.18, Math.PI - 0.36);
+  const geometry = new THREE.SphereGeometry(
+    RADIUS,
+    getWidthSegments(totalCount),
+    22,
+    phiStart,
+    phiLength,
+    0.12,
+    Math.PI - 0.24,
+  );
   const material = createMaterial(index);
   const mesh = new THREE.Mesh(geometry, material);
   const midPhi = phiStart + phiLength / 2;
-  const direction = new THREE.Vector3(Math.cos(midPhi), 0, Math.sin(midPhi)).normalize();
-  const explodedPosition = direction.clone().multiplyScalar(2.1);
-  explodedPosition.y = index % 2 === 0 ? 0.3 : -0.3;
+  const verticalBias = ((index % 4) - 1.5) * 0.12;
+  const direction = new THREE.Vector3(
+    Math.cos(midPhi),
+    verticalBias,
+    Math.sin(midPhi),
+  ).normalize();
+  const explodedPosition = direction.clone().multiplyScalar(2.1 + (index % 3) * 0.16);
 
   return {
     id: `shard-${index}`,
     index,
     mesh,
     material,
-    uvRegion: { u0: index / SHARD_COUNT, v0: 0, u1: (index + 1) / SHARD_COUNT, v1: 1 },
+    uvRegion: { u0: index / totalCount, v0: 0, u1: (index + 1) / totalCount, v1: 1 },
     basePosition: new THREE.Vector3(0, 0, 0),
     explodedPosition,
   };
@@ -53,19 +77,36 @@ function ensureGroup() {
   return shardGroup;
 }
 
-function createFromTopology() {
-  if (shardRecords.length) return shardRecords;
-
-  const group = ensureGroup();
-  shardRecords = Array.from({ length: SHARD_COUNT }, (_, index) => createShard(index));
+function disposeRecords() {
+  if (!shardGroup) return;
 
   shardRecords.forEach((record) => {
+    record.mesh.geometry?.dispose?.();
+    record.mesh.material?.dispose?.();
+    shardGroup.remove(record.mesh);
+  });
+
+  shardRecords = [];
+}
+
+function rebuildShards(forceCount = getDesiredShardCount()) {
+  const group = ensureGroup();
+  disposeRecords();
+
+  shardRecords = Array.from({ length: forceCount }, (_, index) => createShard(index, forceCount));
+  shardRecords.forEach((record) => {
     record.mesh.position.copy(record.explodedPosition);
+    record.mesh.userData.shardId = record.id;
     group.add(record.mesh);
   });
 
   window.SM.shards = shardRecords;
+  window.SM.bus.emit('shards:rebuilt', { count: forceCount, shards: shardRecords });
   return shardRecords;
+}
+
+function createFromTopology() {
+  return shardRecords.length ? shardRecords : rebuildShards();
 }
 
 function animateShards(duration, positionResolver) {
@@ -99,11 +140,11 @@ function animateShards(duration, positionResolver) {
   });
 }
 
-function explode(duration = 320) {
+function explode(duration = 360) {
   return animateShards(duration, (record) => record.explodedPosition);
 }
 
-function aggregate(duration = 1200) {
+function aggregate(duration = 1380) {
   return animateShards(duration, (record) => record.basePosition);
 }
 
@@ -138,19 +179,23 @@ function setVisible(visible) {
 }
 
 function init() {
-  createFromTopology();
+  rebuildShards();
+  offMaterials = window.SM.bus.on('materials:updated', ({ assignments }) => {
+    const nextCount = Math.max(MIN_SHARD_COUNT, assignments?.length || 0);
+    if (nextCount !== shardRecords.length) {
+      rebuildShards(nextCount);
+    } else {
+      window.SM.bus.emit('shards:rebuilt', { count: nextCount, shards: shardRecords });
+    }
+  });
 }
 
 function destroy() {
+  offMaterials?.();
+  offMaterials = null;
   if (!shardGroup) return;
 
-  shardRecords.forEach((record) => {
-    record.mesh.geometry?.dispose?.();
-    record.mesh.material?.dispose?.();
-    shardGroup.remove(record.mesh);
-  });
-
-  shardRecords = [];
+  disposeRecords();
   shardGroup.parent?.remove?.(shardGroup);
   shardGroup = null;
 }
@@ -159,6 +204,7 @@ export {
   init,
   destroy,
   createFromTopology,
+  rebuildShards,
   explode,
   aggregate,
   rotateBy,

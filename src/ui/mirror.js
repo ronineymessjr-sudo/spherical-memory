@@ -5,9 +5,13 @@ let tapCount = 0;
 function updateMirrorCopy() {
   const countEl = document.getElementById('mirror-hit-count');
   const hintEl = document.getElementById('mirror-hint');
+  const stageEl = document.getElementById('mirror-stage-label');
   if (!countEl || !hintEl) return;
 
   countEl.textContent = `${tapCount} / 3 taps`;
+  if (stageEl) {
+    stageEl.textContent = tapCount >= 3 ? 'Phase 03 · Release' : `Phase 0${tapCount + 1} · Charge`;
+  }
   hintEl.textContent = tapCount >= 3
     ? 'Shattering...'
     : tapCount === 2
@@ -31,8 +35,14 @@ function render() {
       <div class="mirror-copy">
         <p class="eyebrow">MEMORY MIRROR</p>
         <h2>Tap to fracture the reflection</h2>
+        <p id="mirror-stage-label" class="mirror-stage-label"></p>
         <p id="mirror-hint" class="mirror-hint"></p>
         <p id="mirror-hit-count" class="mirror-count"></p>
+        <div class="mirror-steps">
+          <span>1. Charge the mirror</span>
+          <span>2. Trigger the fracture</span>
+          <span>3. Rebuild the sphere</span>
+        </div>
       </div>
       <div class="mirror-stage">
         <div class="mirror-frame">

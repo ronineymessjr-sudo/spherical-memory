@@ -17,6 +17,14 @@
     text-align: center;
   }
 
+  .cover-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .mirror-steps {
+    justify-content: center;
+  }
+
   .mirror-frame {
     width: min(84vw, 360px);
   }
@@ -29,6 +37,16 @@
   #upload-container {
     top: calc(env(safe-area-inset-top, 0px) + 12px);
     right: 12px;
+    left: 12px;
+    max-width: none;
+  }
+
+  .upload-panel {
+    min-width: 0;
+  }
+
+  .hud-stack {
+    max-width: min(280px, calc(100vw - 24px));
   }
 }
 
