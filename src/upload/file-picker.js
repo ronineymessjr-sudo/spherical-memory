@@ -1,11 +1,15 @@
+import { onLanguageChange, t, toggleLang } from '../core/i18n.js';
+
 let fileChangeHandler = null;
 let randomizeHandler = null;
 let presetHandler = null;
+let languageToggleHandler = null;
 let dragEnterHandler = null;
 let dragLeaveHandler = null;
 let dragOverHandler = null;
 let dropHandler = null;
 let offMaterials = null;
+let offLanguage = null;
 let dragDepth = 0;
 
 function getStats() {
@@ -28,45 +32,49 @@ function getSummary() {
   const { materials, shardCount, imageCount, videoCount } = getStats();
 
   if (!materials.length) {
-    return 'No media loaded yet. The travel demo set is standing by.';
+    return t('upload.emptySummary');
   }
 
   if (materials.length < shardCount) {
-    return `${imageCount} images and ${videoCount} videos loaded, expanded to ${shardCount} sphere shards.`;
+    return t('upload.expandedSummary', { imageCount, videoCount, shardCount });
   }
 
-  return `${imageCount} images and ${videoCount} videos loaded across ${shardCount} live shards.`;
+  return t('upload.liveSummary', { imageCount, videoCount, shardCount });
 }
 
 function getFormatSummary() {
   const { materials, panoramaCount, imageCount, videoCount } = getStats();
 
   if (!materials.length) {
-    return 'You can keep uploading in batches. New files will append onto the current sphere.';
+    return t('upload.emptyFormat');
   }
 
   if (!panoramaCount) {
-    return `${imageCount} flat images and ${videoCount} videos are using cropped shard mapping.`;
+    return t('upload.flatFormat', { imageCount, videoCount });
   }
 
   if (panoramaCount === materials.length) {
-    return `All ${materials.length} items are using panorama sphere mapping.`;
+    return t('upload.fullPanoFormat', { total: materials.length });
   }
 
-  return `${panoramaCount} panorama items were detected, while the rest keep flat crop distortion.`;
+  return t('upload.mixedFormat', { panoramaCount });
 }
 
 function getListPreview() {
   const { materials } = getStats();
   if (!materials.length) {
-    return '<li class="upload-list-empty">Demo library waiting in the wings</li>';
+    return `<li class="upload-list-empty">${t('upload.listEmpty')}</li>`;
   }
 
   return materials.slice(0, 5).map((item, index) => {
-    const badge = item.type === 'video' ? 'Video' : item.projection === 'panorama' ? 'Pano' : 'Image';
+    const badge = item.type === 'video'
+      ? t('upload.itemVideo')
+      : item.projection === 'panorama'
+        ? t('upload.itemPano')
+        : t('upload.itemImage');
     return `<li><span>${index + 1}. ${item.name}</span><strong>${badge}</strong></li>`;
   }).join('') + (materials.length > 5
-    ? `<li class="upload-list-more">${materials.length - 5} more items already joined the sphere</li>`
+    ? `<li class="upload-list-more">${t('upload.listMore', { remaining: materials.length - 5 })}</li>`
     : '');
 }
 
@@ -84,19 +92,22 @@ function renderStatus() {
   if (!summaryEl || !countEl || !formatEl || !listEl) return;
 
   const { materials, shardCount, imageCount, videoCount, panoramaCount } = getStats();
-  countEl.textContent = `${materials.length} media items / ${shardCount} shards`;
+  countEl.textContent = t('upload.count', { materialCount: materials.length, shardCount });
   summaryEl.textContent = getSummary();
-  formatEl.textContent = `${getFormatSummary()}${panoramaCount ? ' Files containing pano, panorama, 360, or equirect in the name are auto-routed as panoramas.' : ''}`;
+  formatEl.textContent = `${getFormatSummary()}${panoramaCount ? t('upload.panoHint') : ''}`;
   listEl.innerHTML = getListPreview();
 
   const tagsEl = document.getElementById('upload-stats');
   if (tagsEl) {
     tagsEl.innerHTML = `
-      <span>${imageCount} images</span>
-      <span>${videoCount} videos</span>
-      <span>${panoramaCount} panoramas</span>
+      <span>${t('upload.imageBadge', { imageCount })}</span>
+      <span>${t('upload.videoBadge', { videoCount })}</span>
+      <span>${t('upload.panoBadge', { panoramaCount })}</span>
     `;
   }
+
+  const toggleEl = document.getElementById('upload-lang-toggle');
+  if (toggleEl) toggleEl.textContent = t('upload.toggle');
 }
 
 function handleFiles(files) {
@@ -105,28 +116,31 @@ function handleFiles(files) {
   setDropState(false);
 }
 
-function render() {
+function render(force = false) {
   const container = document.getElementById('upload-container');
-  if (!container || container.dataset.ready === '1') return;
+  if (!container || (!force && container.dataset.ready === '1')) return;
 
   container.dataset.ready = '1';
   container.innerHTML = `
     <div class="upload-panel">
       <div class="upload-copy">
-        <strong>Memory Studio</strong>
+        <div class="upload-title-row">
+          <strong>${t('upload.title')}</strong>
+          <button id="upload-lang-toggle" class="upload-button upload-button-compact" type="button">${t('upload.toggle')}</button>
+        </div>
         <span id="upload-count"></span>
         <p id="upload-summary"></p>
         <p id="upload-format-summary" class="upload-format-summary"></p>
       </div>
       <div id="upload-stats" class="upload-badges"></div>
       <label id="upload-dropzone" class="upload-picker" for="upload-images" data-drag="0">
-        <span>Drop files here or tap to keep adding media</span>
-        <small>Supports JPG, PNG, WebP, MP4, and panorama-ready names</small>
+        <span>${t('upload.dropTitle')}</span>
+        <small>${t('upload.dropHint')}</small>
         <input id="upload-images" type="file" accept="image/*,video/*" multiple>
       </label>
       <div class="upload-actions">
-        <button id="upload-randomize" class="upload-button alt" type="button">Shuffle sphere</button>
-        <button id="upload-preset" class="upload-button" type="button">Restore demo set</button>
+        <button id="upload-randomize" class="upload-button alt" type="button">${t('upload.shuffle')}</button>
+        <button id="upload-preset" class="upload-button" type="button">${t('upload.restore')}</button>
       </div>
       <ul id="upload-list" class="upload-list"></ul>
     </div>
@@ -135,6 +149,7 @@ function render() {
   const input = container.querySelector('#upload-images');
   const randomizeButton = container.querySelector('#upload-randomize');
   const presetButton = container.querySelector('#upload-preset');
+  const languageToggleButton = container.querySelector('#upload-lang-toggle');
   const dropzone = container.querySelector('#upload-dropzone');
 
   fileChangeHandler = (event) => {
@@ -144,11 +159,16 @@ function render() {
   };
 
   randomizeHandler = () => {
+    window.SM.modules.render3d?.shardMesh?.randomizeTopology?.();
     window.SM.modules.upload?.materialRouter?.randomizeAssignments?.();
   };
 
   presetHandler = () => {
     window.SM.modules.upload?.materialRouter?.usePresetMaterials?.();
+  };
+
+  languageToggleHandler = () => {
+    toggleLang();
   };
 
   dragEnterHandler = (event) => {
@@ -177,6 +197,7 @@ function render() {
   input?.addEventListener('change', fileChangeHandler);
   randomizeButton?.addEventListener('click', randomizeHandler);
   presetButton?.addEventListener('click', presetHandler);
+  languageToggleButton?.addEventListener('click', languageToggleHandler);
   dropzone?.addEventListener('dragenter', dragEnterHandler);
   dropzone?.addEventListener('dragleave', dragLeaveHandler);
   dropzone?.addEventListener('dragover', dragOverHandler);
@@ -187,6 +208,10 @@ function render() {
 function init() {
   render();
   offMaterials = window.SM.bus.on('materials:updated', renderStatus);
+  offLanguage = onLanguageChange(() => {
+    render(true);
+    renderStatus();
+  });
   renderStatus();
 }
 
@@ -195,15 +220,19 @@ function destroy() {
   container?.querySelector('#upload-images')?.removeEventListener('change', fileChangeHandler);
   container?.querySelector('#upload-randomize')?.removeEventListener('click', randomizeHandler);
   container?.querySelector('#upload-preset')?.removeEventListener('click', presetHandler);
+  container?.querySelector('#upload-lang-toggle')?.removeEventListener('click', languageToggleHandler);
   container?.querySelector('#upload-dropzone')?.removeEventListener('dragenter', dragEnterHandler);
   container?.querySelector('#upload-dropzone')?.removeEventListener('dragleave', dragLeaveHandler);
   container?.querySelector('#upload-dropzone')?.removeEventListener('dragover', dragOverHandler);
   container?.querySelector('#upload-dropzone')?.removeEventListener('drop', dropHandler);
   offMaterials?.();
+  offLanguage?.();
   offMaterials = null;
+  offLanguage = null;
   fileChangeHandler = null;
   randomizeHandler = null;
   presetHandler = null;
+  languageToggleHandler = null;
   dragEnterHandler = null;
   dragLeaveHandler = null;
   dragOverHandler = null;

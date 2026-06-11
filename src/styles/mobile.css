@@ -61,6 +61,37 @@
   .upload-actions {
     grid-template-columns: 1fr;
   }
+
+  .cover-card h1,
+  .mirror-copy h2 {
+    max-width: 100%;
+  }
+
+  .cover-copy,
+  .hud-focus-card p:last-child,
+  .hud-library-card p:last-child,
+  .upload-copy p {
+    font-size: 0.92rem;
+  }
+
+  .memory-toolbar {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  }
+
+  .memory-card {
+    top: auto;
+    bottom: 220px;
+    right: 12px;
+    left: 12px;
+    max-width: none;
+    transform: translateY(0);
+  }
+  .memory-card[data-visible="1"] {
+    transform: translateY(0);
+  }
 }
 
 @media (orientation: landscape) and (max-height: 540px) {
@@ -74,5 +105,11 @@
 
   .cover-preview-card {
     min-height: 112px;
+  }
+
+  .memory-toolbar {
+    bottom: 12px;
+    left: 12px;
+    width: min(320px, calc(100vw - 24px));
   }
 }

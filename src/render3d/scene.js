@@ -82,6 +82,7 @@ function init() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight, false);
+    window.SM?.composer?.setSize?.(window.innerWidth, window.innerHeight);
   };
 
   window.addEventListener('resize', resizeHandler);
@@ -98,7 +99,11 @@ function init() {
       backdrop.rotation.x = Math.sin(elapsed * 0.12) * 0.08;
     }
 
-    renderer.render(scene, camera);
+    if (window.SM?.composer?.render) {
+      window.SM.composer.render();
+    } else {
+      renderer.render(scene, camera);
+    }
   };
 
   loop();

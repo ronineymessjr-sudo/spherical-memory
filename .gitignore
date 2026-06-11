@@ -23,6 +23,7 @@ yarn-debug.log*
 dist/
 build/
 node_modules/
+artifacts/
 
 # Backups
 *.bak

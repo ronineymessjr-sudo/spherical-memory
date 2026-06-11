@@ -1,10 +1,16 @@
+import { onLanguageChange, t } from '../core/i18n.js';
+
 let screenshotHandler = null;
 let resetHandler = null;
 let demoHandler = null;
+let shareHandler = null;
 let offFocus = null;
 let offBlur = null;
 let offState = null;
 let offMaterials = null;
+let offLanguage = null;
+let offTitle = null;
+let lastFocusPayload = null;
 
 function getLibraryStats() {
   const materials = window.SM.materials ?? [];
@@ -21,18 +27,19 @@ function getLibraryStats() {
 }
 
 function updateFocusCard(payload = null) {
+  lastFocusPayload = payload;
   const titleEl = document.getElementById('hud-focus-title');
   const metaEl = document.getElementById('hud-focus-meta');
   if (!titleEl || !metaEl) return;
 
   if (!payload) {
-    titleEl.textContent = 'Sphere overview';
-    metaEl.textContent = 'Drag to orbit, pinch or wheel to zoom, and tap a shard to spotlight it.';
+    titleEl.textContent = t('hud.defaultTitle');
+    metaEl.textContent = t('hud.defaultMeta');
     return;
   }
 
   titleEl.textContent = payload.materialName || payload.shardId;
-  metaEl.textContent = `${payload.materialType === 'video' ? 'Video shard' : 'Image shard'} - ${payload.projection === 'panorama' ? 'Panorama mapping' : 'Flat mapping'} - ${payload.repeated ? 'Repeated fill' : `Slot ${payload.slotIndex + 1}`}`;
+  metaEl.textContent = t('hud.focusMeta', payload);
 }
 
 function updateLibraryCard() {
@@ -41,31 +48,36 @@ function updateLibraryCard() {
   if (!statsEl || !detailEl) return;
 
   const stats = getLibraryStats();
-  statsEl.textContent = `${stats.total} media items / ${stats.shardCount} shards`;
-  detailEl.textContent = `${stats.imageCount} images - ${stats.videoCount} videos - ${stats.panoramaCount} panoramas`;
+  statsEl.textContent = t('hud.libraryStats', stats);
+  detailEl.textContent = t('hud.libraryDetail', stats);
 }
 
-function render() {
+function render(force = false) {
   const container = document.getElementById('hud-container');
-  if (!container || container.dataset.ready === '1') return;
+  if (!container || (!force && container.dataset.ready === '1')) return;
 
   container.dataset.ready = '1';
   container.innerHTML = `
     <div class="hud-stack">
+      <div class="hud-card hud-title-card">
+        <p class="hud-label">${t('toolbar.aiTitle')}</p>
+        <strong id="hud-ai-title"></strong>
+      </div>
       <div class="hud-card hud-focus-card">
-        <p class="hud-label">Current Focus</p>
-        <strong id="hud-focus-title">Sphere overview</strong>
-        <p id="hud-focus-meta">Drag to orbit, pinch or wheel to zoom, and tap a shard to spotlight it.</p>
+        <p class="hud-label">${t('hud.currentFocus')}</p>
+        <strong id="hud-focus-title">${t('hud.defaultTitle')}</strong>
+        <p id="hud-focus-meta">${t('hud.defaultMeta')}</p>
       </div>
       <div class="hud-card hud-library-card">
-        <p class="hud-label">Library Status</p>
+        <p class="hud-label">${t('hud.libraryStatus')}</p>
         <strong id="hud-library-stats"></strong>
         <p id="hud-library-detail"></p>
       </div>
       <div class="hud-card hud-panel">
-        <button id="hud-screenshot" class="hud-button" type="button">Save capture</button>
-        <button id="hud-reset" class="hud-button alt" type="button">Reset flow</button>
-        <button id="hud-demo" class="hud-button alt" type="button">Auto demo</button>
+        <button id="hud-screenshot" class="hud-button" type="button">${t('hud.screenshot')}</button>
+        <button id="hud-share" class="hud-button alt" type="button">${t('share.card')}</button>
+        <button id="hud-reset" class="hud-button alt" type="button">${t('hud.reset')}</button>
+        <button id="hud-demo" class="hud-button alt" type="button">${t('hud.demo')}</button>
       </div>
     </div>
   `;
@@ -86,15 +98,25 @@ function render() {
     window.SM.modules.demo?.mode?.start?.();
   };
 
+  shareHandler = () => {
+    window.SM.modules.output?.share?.share?.();
+  };
+
   container.querySelector('#hud-screenshot')?.addEventListener('click', screenshotHandler);
+  container.querySelector('#hud-share')?.addEventListener('click', shareHandler);
   container.querySelector('#hud-reset')?.addEventListener('click', resetHandler);
   container.querySelector('#hud-demo')?.addEventListener('click', demoHandler);
 }
 
 function init() {
   render();
-  updateFocusCard();
+  updateFocusCard(lastFocusPayload);
   updateLibraryCard();
+  offLanguage = onLanguageChange(() => {
+    render(true);
+    updateFocusCard(lastFocusPayload);
+    updateLibraryCard();
+  });
   offFocus = window.SM.bus.on('shard:focus', updateFocusCard);
   offBlur = window.SM.bus.on('shard:blur', () => updateFocusCard());
   offState = window.SM.bus.on('state:change', ({ to }) => {
@@ -103,24 +125,39 @@ function init() {
     }
   });
   offMaterials = window.SM.bus.on('materials:updated', updateLibraryCard);
+  // AI title surface
+  offTitle = window.SM.bus.on('materials:updated', updateAiTitle);
+  updateAiTitle();
+}
+
+function updateAiTitle() {
+  const titleEl = document.getElementById('hud-ai-title');
+  if (!titleEl) return;
+  titleEl.textContent = window.SM.aiTitle || '';
 }
 
 function destroy() {
   const container = document.getElementById('hud-container');
   container?.querySelector('#hud-screenshot')?.removeEventListener('click', screenshotHandler);
+  container?.querySelector('#hud-share')?.removeEventListener('click', shareHandler);
   container?.querySelector('#hud-reset')?.removeEventListener('click', resetHandler);
   container?.querySelector('#hud-demo')?.removeEventListener('click', demoHandler);
   offFocus?.();
   offBlur?.();
   offState?.();
   offMaterials?.();
+  offLanguage?.();
+  offTitle?.();
   offFocus = null;
   offBlur = null;
   offState = null;
   offMaterials = null;
+  offLanguage = null;
+  offTitle = null;
   screenshotHandler = null;
   resetHandler = null;
   demoHandler = null;
+  shareHandler = null;
 }
 
 export {

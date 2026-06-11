@@ -19,6 +19,43 @@ export class UnifiedInput {
     this.target.addEventListener('pointerup', this._onUp);
     this.target.addEventListener('pointercancel', this._onUp);
     this.target.addEventListener('wheel', this._onWheel, { passive: false });
+    this._longPressTimer = 0;
+    this._longPressTriggered = false;
+    this._longPressStartX = 0;
+    this._longPressStartY = 0;
+    this._longPressTarget = null;
+    this._longPressStartAt = 0;
+  }
+
+  _startLongPress(x, y, target) {
+    this._cancelLongPress();
+    this._longPressStartX = x;
+    this._longPressStartY = y;
+    this._longPressTarget = target;
+    this._longPressStartAt = performance.now();
+    this._longPressTimer = window.setTimeout(() => {
+      this._longPressTriggered = true;
+      this.bus.emit('input:long-press-start', {
+        x: this._longPressStartX,
+        y: this._longPressStartY,
+        target: this._longPressTarget,
+      });
+    }, 460);
+  }
+
+  _cancelLongPress(fireEnd = true) {
+    if (this._longPressTimer) {
+      window.clearTimeout(this._longPressTimer);
+      this._longPressTimer = 0;
+    }
+    if (fireEnd && this._longPressTriggered) {
+      this.bus.emit('input:long-press-end', {
+        x: this._longPressStartX,
+        y: this._longPressStartY,
+        target: this._longPressTarget,
+      });
+    }
+    this._longPressTriggered = false;
   }
 
   bindTarget(el, name) {
@@ -92,10 +129,12 @@ export class UnifiedInput {
       this._down = { x: event.clientX, y: event.clientY };
       this._isDragging = false;
       this._isPinching = false;
+      this._startLongPress(event.clientX, event.clientY, this._resolveTarget(event.clientX, event.clientY));
       return;
     }
 
     if (this._pointers.size === 2) {
+      this._cancelLongPress();
       if (this._isDragging && this._down) {
         this.bus.emit('input:drag-end', {
           x: event.clientX,
@@ -134,6 +173,10 @@ export class UnifiedInput {
     if (!this._isDragging && Math.hypot(dx, dy) < 5) return;
 
     if (!this._isDragging) {
+      this._cancelLongPress(false);
+    }
+
+    if (!this._isDragging) {
       this._isDragging = true;
       const target = this._resolveTarget(this._down.x, this._down.y);
       this.bus.emit('input:drag-start', { x: this._down.x, y: this._down.y, target });
@@ -164,6 +207,8 @@ export class UnifiedInput {
       this._isDragging = false;
       return;
     }
+
+    this._cancelLongPress();
 
     if (this._primaryPointerId !== event.pointerId) return;
 

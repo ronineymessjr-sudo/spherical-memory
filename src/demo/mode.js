@@ -1,3 +1,5 @@
+import { t } from '../core/i18n.js';
+
 let timers = [];
 let active = false;
 
@@ -25,7 +27,7 @@ function showBadge() {
   const badge = document.createElement('div');
   badge.id = 'demo-badge';
   badge.className = 'demo-badge';
-  badge.textContent = 'Auto demo running';
+  badge.textContent = t('demo.badge');
   document.body.appendChild(badge);
 }
 
@@ -67,21 +69,22 @@ function start() {
     let spins = 0;
 
     function spin() {
-      if (!active || spins > 140) return;
-      shardMesh?.rotateBy?.(0.012, Math.sin(spins / 20) * 0.0008);
+      if (!active || spins > 120) return;
+      // Halved from 0.0052 to 0.0026 — feels more "装置艺术", less "游戏特效".
+      shardMesh?.rotateBy?.(0.0026, Math.sin(spins / 28) * 0.00018);
       spins += 1;
-      later(16, spin);
+      later(28, spin);
     }
 
     spin();
   });
 
-  later(9200, () => {
+  later(9500, () => {
     if (!active) return;
     window.SM.modules.output?.screenshot?.take?.();
   });
 
-  later(10200, () => {
+  later(10600, () => {
     stop();
   });
 }

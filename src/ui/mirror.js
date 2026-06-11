@@ -1,5 +1,8 @@
+import { onLanguageChange, t } from '../core/i18n.js';
+
 let offTap = null;
 let offState = null;
+let offLanguage = null;
 let tapCount = 0;
 
 function updateMirrorCopy() {
@@ -10,18 +13,20 @@ function updateMirrorCopy() {
   const steps = Array.from(document.querySelectorAll('.mirror-step'));
   if (!countEl || !hintEl || !stageEl || !barEl) return;
 
-  countEl.textContent = `${tapCount} / 3 hits`;
-  stageEl.textContent = tapCount >= 3 ? 'Phase 03 - Release' : `Phase 0${tapCount + 1} - Charge`;
+  countEl.textContent = t('mirror.count', { count: tapCount });
+  stageEl.textContent = tapCount >= 3
+    ? t('mirror.phaseRelease')
+    : t('mirror.phaseCharge', { phase: tapCount + 1 });
   barEl.style.setProperty('--progress', `${(tapCount / 3) * 100}%`);
   steps.forEach((step, index) => {
     step.dataset.active = index < tapCount ? '1' : '0';
   });
 
   hintEl.textContent = tapCount >= 3
-    ? 'The mirror is releasing the shard cloud...'
+    ? t('mirror.hintRelease')
     : tapCount === 2
-      ? 'One more hit and the sphere will rebuild itself.'
-      : 'Tap the mirror three times to unlock the memory sphere.';
+      ? t('mirror.hintAlmost')
+      : t('mirror.hintStart');
 }
 
 function resetMirror() {
@@ -30,24 +35,24 @@ function resetMirror() {
   window.SM.modules.anim?.mirrorCrack?.reset?.();
 }
 
-function render() {
+function render(force = false) {
   const container = document.getElementById('mirror-container');
-  if (!container || container.dataset.ready === '1') return;
+  if (!container || (!force && container.dataset.ready === '1')) return;
 
   container.dataset.ready = '1';
   container.innerHTML = `
     <section class="mirror-screen">
       <div class="mirror-copy">
         <p class="eyebrow">MEMORY MIRROR</p>
-        <h2>Break the reflection and release the travel archive.</h2>
+        <h2>${t('mirror.title')}</h2>
         <p id="mirror-stage-label" class="mirror-stage-label"></p>
         <p id="mirror-hint" class="mirror-hint"></p>
         <div id="mirror-progress-bar" class="mirror-progress-bar"></div>
         <p id="mirror-hit-count" class="mirror-count"></p>
         <div class="mirror-steps">
-          <span class="mirror-step" data-active="0">1. Charge</span>
-          <span class="mirror-step" data-active="0">2. Fracture</span>
-          <span class="mirror-step" data-active="0">3. Aggregate</span>
+          <span class="mirror-step" data-active="0">${t('mirror.step1')}</span>
+          <span class="mirror-step" data-active="0">${t('mirror.step2')}</span>
+          <span class="mirror-step" data-active="0">${t('mirror.step3')}</span>
         </div>
       </div>
       <div class="mirror-stage">
@@ -66,6 +71,10 @@ function render() {
 
 function init() {
   render();
+  offLanguage = onLanguageChange(() => {
+    render(true);
+    updateMirrorCopy();
+  });
 
   offTap = window.SM.bus.on('input:tap', ({ target }) => {
     if (window.SM.currentState !== 'mirror') return;
@@ -92,8 +101,10 @@ function init() {
 function destroy() {
   offTap?.();
   offState?.();
+  offLanguage?.();
   offTap = null;
   offState = null;
+  offLanguage = null;
 }
 
 export {

@@ -88,4 +88,24 @@ describe('material-router', () => {
     expect(window.SM.materials.map((item) => item.name)).toEqual(['one.jpg', 'two.png', 'three.mp4']);
     expect(window.SM.materialAssignments).toHaveLength(6);
   });
+
+  it('restores the full library after drilling into a memory group', () => {
+    materialRouter.applyMaterials([
+      { id: 'a', type: 'image', name: '2025-08-island-sunrise.jpg', url: 'a.jpg' },
+      { id: 'b', type: 'image', name: '2025-08-island-night.jpg', url: 'b.jpg' },
+      { id: 'c', type: 'image', name: '2025-09-city-rain.jpg', url: 'c.jpg' },
+    ]);
+
+    const firstGroupKey = window.SM.aiGroups[0].key;
+    materialRouter.useGroupMaterials(firstGroupKey);
+
+    expect(window.SM.materials).toHaveLength(2);
+    expect(window.SM.activeGroupKey).toBe(firstGroupKey);
+
+    materialRouter.restoreAllMaterials();
+
+    expect(window.SM.materials).toHaveLength(3);
+    expect(window.SM.materialLibrary).toHaveLength(3);
+    expect(window.SM.activeGroupKey).toBe('__all__');
+  });
 });

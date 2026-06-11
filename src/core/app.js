@@ -6,6 +6,7 @@ window.SM = {
   version: '1.0.0',
   debug: window.SM_DEBUG_FLAGS?.debug ?? false,
   startTime: Date.now(),
+  lang: 'en',
   currentState: 'cover',
   prevState: null,
   materials: [],
@@ -26,27 +27,41 @@ window.SM = {
 const SM = window.SM;
 
 const CORE_SEQUENCE = [
+  ['core', 'i18n', () => import('./i18n.js')],
   ['render3d', 'scene', () => import('../render3d/scene.js')],
   ['render3d', 'sphereShell', () => import('../render3d/sphere-shell.js')],
   ['render3d', 'shardMesh', () => import('../render3d/shard-mesh.js')],
   ['render3d', 'shardSeam', () => import('../render3d/shard-seam.js')],
   ['render3d', 'ionParticles', () => import('../render3d/ion-particles.js')],
   ['render3d', 'panoramaBind', () => import('../render3d/panorama-bind.js')],
+  ['render3d', 'shardFocusTick', () => import('../render3d/shard-focus-tick.js')],
+  ['render3d', 'materialTheme', () => import('../render3d/material-theme.js')],
+  ['render3d', 'postFx', () => import('../render3d/post-fx.js')],
+  ['render3d', 'envMap', () => import('../render3d/env-map.js')],
   ['upload', 'filePicker', () => import('../upload/file-picker.js')],
   ['upload', 'materialRouter', () => import('../upload/material-router.js')],
   ['anim', 'mirrorCrack', () => import('../anim/mirror-crack.js')],
+  ['anim', 'mirrorShards', () => import('../anim/mirror-shards.js')],
   ['anim', 'aggregate', () => import('../anim/aggregate.js')],
   ['anim', 'shardRotate', () => import('../anim/shard-rotate.js')],
   ['anim', 'shardInteract', () => import('../anim/shard-interact.js')],
+  ['anim', 'breath', () => import('../anim/breath.js')],
+  ['input', 'keyboardShortcuts', () => import('../input/keyboard-shortcuts.js')],
   ['ui', 'cover', () => import('../ui/cover.js')],
   ['ui', 'mirror', () => import('../ui/mirror.js')],
   ['ui', 'hud', () => import('../ui/hud.js')],
+  ['ui', 'memoryCard', () => import('../ui/memory-card.js')],
+  ['ui', 'memoryToolbar', () => import('../ui/memory-toolbar.js')],
+  ['ui', 'storyModal', () => import('../ui/story-modal.js')],
+  ['ui', 'onboarding', () => import('../ui/onboarding.js')],
   ['demo', 'mode', () => import('../demo/mode.js')],
 ];
 
 const DEFERRED_SEQUENCE = [
   ['output', 'screenshot', () => import('../output/screenshot.js')],
   ['output', 'share', () => import('../output/share.js')],
+  ['output', 'recorder', () => import('../output/recorder.js')],
+  ['output', 'dedication', () => import('../output/dedication.js')],
   ['audio', 'soundFx', () => import('../audio/sound-fx.js')],
 ];
 
@@ -96,12 +111,36 @@ async function loadModules(sequence) {
       const mod = await loader();
       if (!SM.modules[category]) SM.modules[category] = {};
       SM.modules[category][name] = mod;
-      mod.init?.();
+      try {
+        mod.init?.();
+      } catch (initError) {
+        // A module loaded but its init threw. The app must not black-screen —
+        // we mark the module as broken so consumers can detect it.
+        SM.modules[category][name] = { ...mod, init: undefined, __broken: true, __error: initError };
+        console.error(`[SM] init failed ${category}.${name}:`, initError);
+        showErrorChip(`${category}.${name} init failed`);
+      }
       console.log(`%c[SM] ok ${category}.${name}`, 'color:#88ff88');
     } catch (error) {
       console.warn(`[SM] skip ${category}.${name}:`, error?.message || error);
     }
   }
+}
+
+let errorChipEl = null;
+function showErrorChip(message) {
+  if (!errorChipEl) {
+    errorChipEl = document.createElement('div');
+    errorChipEl.className = 'sm-error-chip';
+    errorChipEl.textContent = message;
+    document.body.appendChild(errorChipEl);
+  } else {
+    errorChipEl.textContent = `${errorChipEl.textContent} · ${message}`;
+  }
+  errorChipEl.dataset.visible = '1';
+  window.setTimeout(() => {
+    if (errorChipEl) errorChipEl.dataset.visible = '0';
+  }, 4000);
 }
 
 function queueDeferredModules() {

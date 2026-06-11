@@ -18,9 +18,12 @@ function playStage(stage) {
   applyStage(stage);
 
   if (stage === 3) {
+    // Mirror shards fly out first, then a beat later the particles + shards
+    // aggregate phase starts.
+    window.SM.bus.emit('crack:burst', {});
     window.setTimeout(() => {
       window.SM.bus.emit('crack:explode', {});
-    }, 650);
+    }, 520);
   }
 }
 

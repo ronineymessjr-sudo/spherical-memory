@@ -1,8 +1,11 @@
-let offTap = null;
+import { onLanguageChange, t } from '../core/i18n.js';
 
-function render() {
+let offTap = null;
+let offLanguage = null;
+
+function render(force = false) {
   const container = document.getElementById('cover-container');
-  if (!container || container.dataset.ready === '1') return;
+  if (!container || (!force && container.dataset.ready === '1')) return;
 
   container.dataset.ready = '1';
   container.innerHTML = `
@@ -12,36 +15,36 @@ function render() {
       <div class="cover-glow"></div>
       <div class="cover-card">
         <p class="eyebrow">SPHERICAL MEMORY</p>
-        <h1>Fold travel photos and video into a living memory sphere.</h1>
+        <h1>${t('cover.title')}</h1>
         <p class="cover-copy">
-          Upload any number of images, videos, or panoramas. After the mirror fractures, every file gets redistributed across a rotating sphere of shards you can orbit, zoom, focus, and capture.
+          ${t('cover.copy')}
         </p>
         <div class="cover-preview-grid">
           <article class="cover-preview-card" style="background-image:linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.58)), url('./assets/fallback/travel-media/travel-01-seaside.webp')">
-            <span>Seaside dusk</span>
+            <span>${t('cover.preview1')}</span>
           </article>
           <article class="cover-preview-card" style="background-image:linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.58)), url('./assets/fallback/travel-media/travel-04-city-night.webp')">
-            <span>City after dark</span>
+            <span>${t('cover.preview2')}</span>
           </article>
           <article class="cover-preview-card" style="background-image:linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.58)), url('./assets/fallback/travel-media/travel-08-island-pier.webp')">
-            <span>Island morning</span>
+            <span>${t('cover.preview3')}</span>
           </article>
         </div>
         <div class="cover-stats">
           <div class="cover-stat">
-            <strong>Unlimited uploads</strong>
-            <span>Keep adding new media and let shard count grow with the library</span>
+            <strong>${t('cover.stat1Title')}</strong>
+            <span>${t('cover.stat1Body')}</span>
           </div>
           <div class="cover-stat">
-            <strong>Mixed mapping</strong>
-            <span>Flat frames crop by shard while panorama names auto-wrap to the sphere</span>
+            <strong>${t('cover.stat2Title')}</strong>
+            <span>${t('cover.stat2Body')}</span>
           </div>
           <div class="cover-stat">
-            <strong>Touch-first control</strong>
-            <span>Drag, pinch, shuffle, autoplay, and capture are wired end to end</span>
+            <strong>${t('cover.stat3Title')}</strong>
+            <span>${t('cover.stat3Body')}</span>
           </div>
         </div>
-        <button id="enter-memory-button" class="primary-cta" type="button">Enter the sphere</button>
+        <button id="enter-memory-button" class="primary-cta" type="button">${t('cover.cta')}</button>
       </div>
     </section>
   `;
@@ -53,6 +56,7 @@ function render() {
 
 function init() {
   render();
+  offLanguage = onLanguageChange(() => render(true));
 
   offTap = window.SM.bus.on('input:tap', ({ target }) => {
     if (window.SM.currentState !== 'cover') return;
@@ -63,7 +67,9 @@ function init() {
 
 function destroy() {
   offTap?.();
+  offLanguage?.();
   offTap = null;
+  offLanguage = null;
 }
 
 export {

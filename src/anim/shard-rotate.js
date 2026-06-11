@@ -18,8 +18,8 @@ function startInertia() {
   stopInertia();
 
   const step = () => {
-    velocity.x *= 0.94;
-    velocity.y *= 0.94;
+    velocity.x *= 0.92;
+    velocity.y *= 0.92;
 
     if (Math.abs(velocity.x) < 0.0002 && Math.abs(velocity.y) < 0.0002) {
       velocity = { x: 0, y: 0 };
@@ -53,8 +53,8 @@ function init() {
     if (target !== 'sphere') return;
 
     const nextVelocity = {
-      x: dx * 0.0028,
-      y: dy * 0.0022,
+      x: dx * 0.0018,
+      y: dy * 0.0014,
     };
 
     velocity = nextVelocity;

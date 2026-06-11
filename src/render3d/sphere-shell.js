@@ -79,8 +79,9 @@ function destroy() {
 }
 
 function setVisible(visible) {
-  const root = window.SM?.modules?.render3d?.scene?.getRootGroup?.();
-  if (root) root.visible = visible;
+  // Only toggle the shell group's visibility, NOT the whole rootGroup — the
+  // shards / seams / particles live on rootGroup and must keep rendering.
+  if (shellGroup) shellGroup.visible = !!visible;
 }
 
 function setScale(scale) {

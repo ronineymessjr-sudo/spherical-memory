@@ -162,7 +162,9 @@ async function runSmoke() {
 
     await page.goto(`http://${host}:${port}/?autoclick=3`, { waitUntil: 'networkidle2' });
     await page.waitForFunction(() => window.SM?.currentState === 'sphere', { timeout: 15000 });
-    await page.waitForFunction(() => document.querySelectorAll('#hud-container .hud-button').length === 3, { timeout: 5000 });
+    await page.waitForFunction(() => document.querySelectorAll('#hud-container .hud-button').length >= 3, { timeout: 5000 });
+    await page.waitForFunction(() => !!document.querySelector('#memory-toolbar'), { timeout: 5000 });
+    await page.waitForFunction(() => !!window.SM?.aiTitle, { timeout: 5000 });
 
     const blockingAutoclickRequests = failedRequests.filter((entry) => !entry.endsWith('/favicon.ico'));
     if (consoleErrors.length || blockingAutoclickRequests.length) {
