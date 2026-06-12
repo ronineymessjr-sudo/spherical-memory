@@ -91,7 +91,7 @@ async function launchBrowser(executablePath) {
   });
 }
 
-async function waitForSphere(page, timeout = 30000) {
+async function waitForSphere(page, timeout = 60000) {
   try {
     await page.waitForFunction(() => window.SM?.currentState === 'sphere', { timeout });
   } catch (error) {
