@@ -245,7 +245,8 @@ async function run() {
     console.log('--- CONSOLE (last 30) ---');
     console.log(consoleMsgs.slice(-30).join('\n'));
     await page.screenshot({ path: path.join(rootDir, 'artifacts', `diag-${args.route}.png`), fullPage: false });
-    console.log(`screenshot: artifacts/diag-${args.route}.png`);
+    await page.screenshot({ path: path.join(rootDir, 'artifacts', `diag-${args.route}-full.png`), fullPage: true });
+    console.log(`screenshot: artifacts/diag-${args.route}.png + diag-${args.route}-full.png`);
   } finally {
     await browser.close();
     server.close();
