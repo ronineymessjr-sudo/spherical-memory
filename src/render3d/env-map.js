@@ -19,6 +19,7 @@ function loadProcedural() {
   const renderer = window.SM?.modules?.render3d?.scene?.getRenderer?.();
   const scene = window.SM?.modules?.render3d?.scene?.getScene?.();
   if (!renderer || !scene) return null;
+  disposeEnv();
   pmrem = new THREE.PMREMGenerator(renderer);
   const room = new RoomEnvironment();
   envTexture = pmrem.fromScene(room, 0.04).texture;
@@ -34,6 +35,7 @@ function loadHdr(url) {
   if (!renderer || !scene) return;
   const loader = new RGBELoader();
   loader.load(url, (hdrTexture) => {
+    disposeEnv();
     pmrem = pmrem || new THREE.PMREMGenerator(renderer);
     envTexture = pmrem.fromEquirectangular(hdrTexture).texture;
     scene.environment = envTexture;
@@ -46,6 +48,16 @@ function loadHdr(url) {
     loadProcedural();
     applyToShards();
   });
+}
+
+function disposeEnv() {
+  if (!envTexture && !pmrem) return;
+  const scene = window.SM?.modules?.render3d?.scene?.getScene?.();
+  if (scene) scene.environment = null;
+  envTexture?.dispose?.();
+  pmrem?.dispose?.();
+  envTexture = null;
+  pmrem = null;
 }
 
 function applyToShards() {
@@ -85,12 +97,7 @@ function destroy() {
   offMood?.();
   offTheme = null;
   offMood = null;
-  const scene = window.SM?.modules?.render3d?.scene?.getScene?.();
-  if (scene && envTexture) scene.environment = null;
-  envTexture?.dispose?.();
-  pmrem?.dispose?.();
-  envTexture = null;
-  pmrem = null;
+  disposeEnv();
   initialized = false;
 }
 
