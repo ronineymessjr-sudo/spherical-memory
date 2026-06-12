@@ -8,6 +8,7 @@
     "build": "node scripts/build.mjs",
     "test": "vitest run",
     "smoke": "node scripts/smoke.mjs",
+    "dev": "node scripts/dev-server.mjs",
     "verify": "npm run build && npm run test && npm run smoke"
   },
   "dependencies": {
