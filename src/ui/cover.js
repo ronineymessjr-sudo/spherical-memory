@@ -18,14 +18,13 @@ function render(force = false) {
       <div class="cover-card">
         <div class="cover-hero" aria-hidden="true">
           <div class="cover-hero-halo"></div>
-          <div class="cover-hero-ring ring-a"></div>
-          <div class="cover-hero-ring ring-b"></div>
-          <div class="cover-hero-ring ring-c"></div>
+          <div class="cover-hero-shards" data-shard-host></div>
+          <div class="cover-hero-rings">
+            <div class="cover-hero-ring ring-a"></div>
+            <div class="cover-hero-ring ring-b"></div>
+            <div class="cover-hero-ring ring-c"></div>
+          </div>
           <div class="cover-hero-core"></div>
-          <span class="cover-hero-shard shard-a"></span>
-          <span class="cover-hero-shard shard-b"></span>
-          <span class="cover-hero-shard shard-c"></span>
-          <span class="cover-hero-shard shard-d"></span>
         </div>
         <p class="eyebrow">SPHERICAL MEMORY</p>
         <h1>${t('cover.title')}</h1>
@@ -70,7 +69,57 @@ function render(force = false) {
     window.SM.go('mirror');
   });
 
+  populateShards(container);
+
   updateLoadingState();
+}
+
+// Populate the cover hero with a randomized set of orbiting shards.
+// Each shard gets a unique orbit radius, tilt, starting phase (animation
+// delay), size, and drift speed — the visual result is a slowly turning
+// planet with a small constellation of debris that never follows the same
+// path twice across reloads. The single shared `cover-shard-orbit`
+// keyframe drives z-ordering via scale + opacity so fragments passing
+// behind the planet fade out instead of clipping through the core.
+function populateShards(container) {
+  const host = container.querySelector('[data-shard-host]');
+  if (!host || host.dataset.populated === '1') return;
+  host.dataset.populated = '1';
+
+  const count = 18;
+  const baseOrbit = 60; // px radius at 1× (hero width ~360px, so 60 → ~33% of half-width)
+  for (let i = 0; i < count; i += 1) {
+    const shard = document.createElement('span');
+    shard.className = 'cover-hero-shard';
+
+    // Distribute starting phase fully across the orbit — we want a
+    // handful of shards visible at any static frame, not a clump.
+    // `phase` is in degrees; it's added to --sm-shard-rot in the
+    // transform pipeline so each shard starts at a different angle
+    // along its own great circle. `delay` is kept for animation-delay
+    // (lets a shard begin at "60% into a previous revolution").
+    const phase = (i / count) * 360 + (Math.random() - 0.5) * (360 / count) * 0.6;
+    const radius = baseOrbit * (0.7 + Math.random() * 0.7);
+    const tilt = (Math.random() - 0.5) * 70; // -35..+35 deg
+    const size = 10 + Math.random() * 18;     // 10..28 px
+    const speed = 80 + Math.random() * 30;   // 80..110s per orbit
+    const delay = -(Math.random() * speed);  // randomize start anywhere in the loop
+    const hue = 250 + Math.random() * 70;    // 250..320 — purple→magenta
+    const brightness = 70 + Math.random() * 25;
+
+    shard.style.setProperty('--orbit-radius', `${radius.toFixed(1)}px`);
+    shard.style.setProperty('--orbit-tilt', `${tilt.toFixed(1)}deg`);
+    shard.style.setProperty('--orbit-size', `${size.toFixed(1)}px`);
+    shard.style.setProperty('--orbit-hue', `${hue.toFixed(0)}`);
+    shard.style.setProperty('--orbit-bright', `${brightness.toFixed(0)}%`);
+    shard.style.setProperty('--orbit-speed', `${speed.toFixed(1)}s`);
+    shard.style.setProperty('--orbit-delay', `${delay.toFixed(1)}s`);
+    shard.style.setProperty('--orbit-phase', `${phase.toFixed(1)}deg`);
+    shard.style.animationDuration = `${speed.toFixed(1)}s`;
+    shard.style.animationDelay = `${delay.toFixed(1)}s`;
+
+    host.appendChild(shard);
+  }
 }
 
 function updateLoadingState() {
