@@ -718,6 +718,13 @@ function rebuildShards(forceCount = getDesiredShardCount()) {
   const shardGeometries = buildShardGeometries(forceCount);
   shardRecords = shardGeometries.map((shardGeometry, index) => createShard(index, forceCount, shardGeometry));
 
+  // Cache rest positions for shockwave displacement. Without this the wave
+  // would compound and the shards would drift outward forever.
+  shardRecords.forEach((record) => {
+    const pos = record.mesh.geometry.getAttribute('position');
+    record.restPositions = new Float32Array(pos.array);
+  });
+
   shardRecords.forEach((record) => {
     record.mesh.position.copy(record.explodedPosition);
     record.mesh.quaternion.copy(new THREE.Quaternion());
@@ -729,6 +736,66 @@ function rebuildShards(forceCount = getDesiredShardCount()) {
   window.SM.shards = shardRecords;
   window.SM.bus.emit('shards:rebuilt', { count: forceCount, shards: shardRecords });
   return shardRecords;
+}
+
+// Per-frame shockwave displacement. CPU-side, applied to each shard's
+// BufferGeometry; reset to rest positions first so the wave decays cleanly.
+let shockwaveFrame = 0;
+function applyShockwave() {
+  // The shockwave module is a sibling — pull it dynamically so we don't
+  // create a circular import.
+  const shockwave = window.SM?.modules?.anim?.shockwave;
+  const active = shockwave?.getActive?.();
+  if (!shockwaveFrame) shockwaveFrame = window.requestAnimationFrame(applyShockwave);
+
+  if (!active) return; // no wave in flight — bail, but keep the loop alive
+
+  const now = performance.now() * 0.001;
+  const age = now - active.startedAt;
+  const lifetime = shockwave.SHOCKWAVE_LIFETIME;
+  if (age > lifetime) {
+    // Wave is over. Snap back to rest positions.
+    shardRecords.forEach((record) => {
+      if (!record.restPositions) return;
+      const pos = record.mesh.geometry.getAttribute('position');
+      pos.array.set(record.restPositions);
+      pos.needsUpdate = true;
+      record.mesh.geometry.computeVertexNormals();
+    });
+    shockwave.consume();
+    return;
+  }
+
+  const frontDistance = age * shockwave.SHOCKWAVE_SPEED;
+  const fade = Math.max(0, 1 - age / lifetime);
+  const amp = shockwave.SHOCKWAVE_AMPLITUDE * fade;
+  const epicenter = active.epicenter;
+  const tmp = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+
+  shardRecords.forEach((record) => {
+    if (!record.restPositions) return;
+    const pos = record.mesh.geometry.getAttribute('position');
+    const rest = record.restPositions;
+    for (let i = 0; i < pos.count; i += 1) {
+      const ox = rest[i * 3], oy = rest[i * 3 + 1], oz = rest[i * 3 + 2];
+      tmp.set(ox, oy, oz).normalize();
+      const distFromEpicenter = tmp.dot(epicenter); // [-1, 1]
+      // Wave peak: gaussian centered on frontDistance, evaluated at the
+      // vertex's "arc distance" from the epicenter.
+      const arcDistance = Math.acos(THREE.MathUtils.clamp(distFromEpicenter, -1, 1));
+      const offset = arcDistance - frontDistance;
+      const gaussian = Math.exp(-(offset * offset) / (2 * shockwave.SHOCKWAVE_WIDTH * shockwave.SHOCKWAVE_WIDTH));
+      // Only push outward, not inward.
+      const displacement = gaussian * amp;
+      normal.copy(tmp);
+      pos.array[i * 3] = ox + normal.x * displacement;
+      pos.array[i * 3 + 1] = oy + normal.y * displacement;
+      pos.array[i * 3 + 2] = oz + normal.z * displacement;
+    }
+    pos.needsUpdate = true;
+    record.mesh.geometry.computeVertexNormals();
+  });
 }
 
 function randomizeTopology() {
@@ -892,6 +959,7 @@ function getPalette(mood = liveState.mood) {
 
 function init() {
   rebuildShards();
+  if (!shockwaveFrame) shockwaveFrame = window.requestAnimationFrame(applyShockwave);
   offMaterials = window.SM.bus.on('materials:updated', ({ assignments }) => {
     const nextCount = Math.max(MIN_SHARD_COUNT, assignments?.length || 0);
     if (nextCount !== shardRecords.length) {
@@ -911,6 +979,10 @@ function destroy() {
   offMaterials = null;
   offArrangement = null;
   offMood = null;
+  if (shockwaveFrame) {
+    window.cancelAnimationFrame(shockwaveFrame);
+    shockwaveFrame = 0;
+  }
   if (!shardGroup) return;
 
   disposeRecords();
