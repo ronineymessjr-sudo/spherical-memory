@@ -72,7 +72,7 @@ function init() {
 
   rootGroup = new THREE.Group();
   rootGroup.name = 'sphere-root';
-  rootGroup.visible = false;
+  rootGroup.visible = true;
 
   backdrop = createBackdrop();
   scene.add(ambient, hemi, key, rim, backdrop, rootGroup);
