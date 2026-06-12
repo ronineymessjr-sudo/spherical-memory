@@ -1,15 +1,9 @@
 import { onLanguageChange, t } from '../core/i18n.js';
-import {
-  initCoverPlanet,
-  destroyCoverPlanet,
-  setCoverPlanetMood,
-} from '../render3d/cover-planet.js';
 
 let offTap = null;
 let offLanguage = null;
 let offProgress = null;
 let offReady = null;
-let offMood = null;
 
 function render(force = false) {
   const container = document.getElementById('cover-container');
@@ -76,19 +70,6 @@ function render(force = false) {
   });
 
   populateShards(container);
-
-  // Hand the planet host to the WebGL shader module. It mounts a canvas
-  // inside .cover-hero-core, runs a real FBM aurora fragment shader with
-  // atmospheric scattering + specular, and the CSS multi-layer planet
-  // stays as fallback when ?renderMode=2d is set.
-  const host = container.querySelector('.cover-hero-core');
-  if (host) {
-    const used = initCoverPlanet(host);
-    // If WebGL is active, dim the CSS background so the shader can carry
-    // the look. The CSS stack still shows through any transparent
-    // fragments, so the rim glow / box-shadow halo remain intact.
-    if (used) host.dataset.mode = 'webgl';
-  }
 
   updateLoadingState();
 }
@@ -171,9 +152,6 @@ function init() {
   });
   offProgress = window.SM.bus.on('app:loading-progress', updateLoadingState);
   offReady = window.SM.bus.on('app:ready', updateLoadingState);
-  offMood = window.SM.bus.on('mood:change', ({ name }) => {
-    if (name) setCoverPlanetMood(name);
-  });
 
   offTap = window.SM.bus.on('input:tap', ({ target }) => {
     if (window.SM.currentState !== 'cover') return;
@@ -188,13 +166,10 @@ function destroy() {
   offLanguage?.();
   offProgress?.();
   offReady?.();
-  offMood?.();
-  destroyCoverPlanet();
   offTap = null;
   offLanguage = null;
   offProgress = null;
   offReady = null;
-  offMood = null;
 }
 
 export {
