@@ -5,6 +5,7 @@
 
 let context = null;
 let masterGain = null;
+let analyser = null;
 let noiseNode = null;
 let noiseFilter = null;
 let noiseGainNode = null;
@@ -71,8 +72,26 @@ function ensureContext() {
   context = new Ctx();
   masterGain = context.createGain();
   masterGain.gain.value = 0;
-  masterGain.connect(context.destination);
+  // Analyser tap sits right before the destination so its data reflects the
+  // final mix.
+  analyser = context.createAnalyser();
+  analyser.fftSize = 256;
+  analyser.smoothingTimeConstant = 0.78;
+  masterGain.connect(analyser);
+  analyser.connect(context.destination);
   return context;
+}
+
+function getAnalyser() {
+  if (!context) ensureContext();
+  return analyser;
+}
+
+function getFrequencyData() {
+  if (!analyser) return null;
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+  return data;
 }
 
 function buildNoise() {
@@ -248,5 +267,7 @@ export {
   start,
   stop,
   applyPreset,
+  getAnalyser,
+  getFrequencyData,
   MOOD_PRESETS,
 };
