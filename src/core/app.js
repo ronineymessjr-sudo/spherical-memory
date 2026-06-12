@@ -72,6 +72,18 @@ const EXPERIENCE_SEQUENCE = [
   ['demo', 'mode', () => import('../demo/mode.js')],
 ];
 
+// Pure DOM modules — keep these on every render mode.  When WebGL is
+// unavailable we still want the cover, mirror, toolbar, story modal,
+// onboarding, and demo machinery to mount so the user gets a working
+// static page (render2d/fallback.js) instead of a half-built app.
+const DOM_ONLY_CATEGORIES = new Set(['input', 'ui', 'demo']);
+
+function getExperienceSequence() {
+  if (SM.webglOK) return EXPERIENCE_SEQUENCE;
+  return EXPERIENCE_SEQUENCE.filter(([category]) => DOM_ONLY_CATEGORIES.has(category));
+}
+
+
 const DEFERRED_SEQUENCE = [
   ['output', 'screenshot', () => import('../output/screenshot.js')],
   ['output', 'share', () => import('../output/share.js')],
@@ -329,7 +341,8 @@ async function init() {
   });
 
   bindInputTargets();
-  const totalCoreModules = BOOT_SEQUENCE.length + EXPERIENCE_SEQUENCE.length;
+  const experienceSequence = getExperienceSequence();
+  const totalCoreModules = BOOT_SEQUENCE.length + experienceSequence.length;
   publishLoadingProgress('boot', 0, totalCoreModules, 'boot');
   await loadModules(BOOT_SEQUENCE, {
     phase: 'boot',
@@ -341,7 +354,7 @@ async function init() {
   SM.bus.emit('app:boot-ready');
   dismissBootSplash();
 
-  await loadModules(EXPERIENCE_SEQUENCE, {
+  await loadModules(experienceSequence, {
     phase: 'experience',
     total: totalCoreModules,
     offset: BOOT_SEQUENCE.length,
