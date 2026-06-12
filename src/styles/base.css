@@ -4,6 +4,12 @@
   padding: 0;
 }
 
+@property --sm-aurora-rot {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: true;
+}
+
 :root {
   color-scheme: dark;
   --bg-0: #060b16;
@@ -404,18 +410,19 @@ body[data-state="share"] #upload-container {
 }
 
 .cover-hero-halo {
-  width: 86%;
-  height: 86%;
+  width: 96%;
+  height: 96%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(143, 214, 255, 0.22), rgba(143, 214, 255, 0) 70%);
-  filter: blur(14px);
+  background:
+    radial-gradient(circle, rgba(176, 102, 255, 0.42) 0%, rgba(110, 76, 220, 0.18) 32%, rgba(60, 36, 120, 0) 64%);
+  filter: blur(18px);
   animation: pulse-glow 5.2s ease-in-out infinite;
 }
 
 .cover-hero-ring {
   border-radius: 50%;
-  border: 1px solid rgba(143, 214, 255, 0.2);
-  box-shadow: 0 0 26px rgba(143, 214, 255, 0.14);
+  border: 1px solid rgba(176, 102, 255, 0.24);
+  box-shadow: 0 0 30px rgba(176, 102, 255, 0.18);
 }
 
 .cover-hero-ring.ring-a {
@@ -438,16 +445,64 @@ body[data-state="share"] #upload-container {
   animation: orbit-tilt-b 9.4s ease-in-out infinite;
 }
 
+/* iOS 18 dark-purple aurora planet. Built as a stack:
+   1. base dark-purple radial gradient (the body of the planet)
+   2. rotating aurora bands via conic-gradient (slow, almost-static)
+   3. highlight + cold rim-light inset shadows
+   4. atmospheric outer glow
+   We avoid filter:blur on the core itself so the bands stay sharp;
+   the surrounding halo carries the soft falloff. */
 .cover-hero-core {
-  width: 30%;
-  height: 30%;
+  width: 32%;
+  height: 32%;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 34% 34%, #fff9fd 0%, #d6efff 20%, #8fd6ff 54%, rgba(143, 214, 255, 0.18) 76%, transparent 100%);
+    /* aurora band 3 — magenta, low contrast, drifts opposite direction */
+    conic-gradient(from calc(var(--sm-aurora-rot, 0deg) + 60deg) at 50% 50%,
+      rgba(255, 96, 196, 0) 0%,
+      rgba(255, 96, 196, 0.22) 18%,
+      rgba(176, 102, 255, 0.18) 36%,
+      rgba(255, 96, 196, 0) 54%,
+      rgba(120, 200, 255, 0.10) 72%,
+      rgba(255, 96, 196, 0) 100%),
+    /* aurora band 2 — violet, mid intensity */
+    conic-gradient(from calc(var(--sm-aurora-rot, 0deg) - 30deg) at 50% 50%,
+      rgba(176, 102, 255, 0) 0%,
+      rgba(176, 102, 255, 0.30) 22%,
+      rgba(120, 200, 255, 0.16) 42%,
+      rgba(176, 102, 255, 0) 60%,
+      rgba(255, 130, 220, 0.12) 82%,
+      rgba(176, 102, 255, 0) 100%),
+    /* aurora band 1 — cyan streak, sharpest */
+    conic-gradient(from var(--sm-aurora-rot, 0deg) at 50% 50%,
+      rgba(120, 200, 255, 0) 0%,
+      rgba(120, 200, 255, 0.24) 26%,
+      rgba(255, 255, 255, 0.10) 44%,
+      rgba(120, 200, 255, 0) 60%,
+      rgba(120, 200, 255, 0.18) 84%,
+      rgba(120, 200, 255, 0) 100%),
+    /* base body — dark purple radial, top-left lit */
+    radial-gradient(circle at 36% 30%,
+      #5a3a98 0%,
+      #3a2168 26%,
+      #1d0f3a 56%,
+      #0c0625 82%,
+      #070316 100%);
   box-shadow:
-    0 0 42px rgba(143, 214, 255, 0.34),
-    0 0 100px rgba(143, 214, 255, 0.16);
-  animation: boot-core 4.4s ease-in-out infinite;
+    /* rim light — cold blue, bottom-right edge */
+    inset -6px -8px 22px rgba(120, 200, 255, 0.28),
+    /* top-left warm magenta highlight */
+    inset 4px 6px 18px rgba(255, 130, 220, 0.18),
+    /* atmospheric glow, primary */
+    0 0 36px rgba(176, 102, 255, 0.55),
+    /* atmospheric glow, secondary wider */
+    0 0 84px rgba(110, 76, 220, 0.36),
+    /* outermost falloff */
+    0 0 140px rgba(60, 36, 120, 0.22);
+  animation:
+    boot-core 4.4s ease-in-out infinite,
+    cover-aurora-spin 28s linear infinite;
+  will-change: transform, background;
 }
 
 .cover-hero-shard {
@@ -455,8 +510,8 @@ body[data-state="share"] #upload-container {
   height: 26px;
   border-radius: 12px;
   clip-path: polygon(50% 0%, 100% 24%, 80% 100%, 18% 88%, 0% 28%);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(143, 214, 255, 0.2));
-  box-shadow: 0 0 18px rgba(143, 214, 255, 0.26);
+  background: linear-gradient(180deg, rgba(255, 220, 255, 0.96), rgba(176, 102, 255, 0.22));
+  box-shadow: 0 0 18px rgba(176, 102, 255, 0.34);
 }
 
 .cover-hero-shard.shard-a { animation: boot-shard-a 5.2s ease-in-out infinite; }
@@ -1241,6 +1296,11 @@ body[data-state="share"] #upload-container {
   50% {
     transform: translate(-50%, -50%) scale(1.05);
   }
+}
+
+@keyframes cover-aurora-spin {
+  from { --sm-aurora-rot: 0deg; }
+  to   { --sm-aurora-rot: 360deg; }
 }
 
 @keyframes boot-pulse {
