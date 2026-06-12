@@ -7,6 +7,10 @@ window.SM = {
   debug: window.SM_DEBUG_FLAGS?.debug ?? false,
   startTime: Date.now(),
   lang: 'en',
+  appReady: false,
+  bootReady: false,
+  loadingPhase: 'boot',
+  loadingProgress: 0,
   currentState: 'cover',
   prevState: null,
   materials: [],
@@ -26,8 +30,15 @@ window.SM = {
 
 const SM = window.SM;
 
-const CORE_SEQUENCE = [
+const BOOT_SEQUENCE = [
   ['core', 'i18n', () => import('./i18n.js')],
+  ['upload', 'materialRouter', () => import('../upload/material-router.js')],
+  ['upload', 'filePicker', () => import('../upload/file-picker.js')],
+  ['ui', 'cover', () => import('../ui/cover.js')],
+  ['ui', 'mirror', () => import('../ui/mirror.js')],
+];
+
+const EXPERIENCE_SEQUENCE = [
   ['render3d', 'scene', () => import('../render3d/scene.js')],
   ['render3d', 'sphereShell', () => import('../render3d/sphere-shell.js')],
   ['render3d', 'shardMesh', () => import('../render3d/shard-mesh.js')],
@@ -38,8 +49,6 @@ const CORE_SEQUENCE = [
   ['render3d', 'materialTheme', () => import('../render3d/material-theme.js')],
   ['render3d', 'postFx', () => import('../render3d/post-fx.js')],
   ['render3d', 'envMap', () => import('../render3d/env-map.js')],
-  ['upload', 'filePicker', () => import('../upload/file-picker.js')],
-  ['upload', 'materialRouter', () => import('../upload/material-router.js')],
   ['anim', 'mirrorCrack', () => import('../anim/mirror-crack.js')],
   ['anim', 'mirrorShards', () => import('../anim/mirror-shards.js')],
   ['anim', 'aggregate', () => import('../anim/aggregate.js')],
@@ -47,8 +56,6 @@ const CORE_SEQUENCE = [
   ['anim', 'shardInteract', () => import('../anim/shard-interact.js')],
   ['anim', 'breath', () => import('../anim/breath.js')],
   ['input', 'keyboardShortcuts', () => import('../input/keyboard-shortcuts.js')],
-  ['ui', 'cover', () => import('../ui/cover.js')],
-  ['ui', 'mirror', () => import('../ui/mirror.js')],
   ['ui', 'hud', () => import('../ui/hud.js')],
   ['ui', 'memoryCard', () => import('../ui/memory-card.js')],
   ['ui', 'memoryToolbar', () => import('../ui/memory-toolbar.js')],
@@ -90,6 +97,109 @@ function applyStateToDom(nextState) {
   document.body.dataset.state = nextState;
 }
 
+function ensureBootSplash() {
+  let splash = document.getElementById('boot-splash');
+  if (splash) return splash;
+
+  splash = document.createElement('div');
+  splash.id = 'boot-splash';
+  splash.className = 'boot-splash';
+  splash.innerHTML = `
+    <div class="boot-splash-backdrop"></div>
+    <div class="boot-splash-stage" aria-hidden="true">
+      <div class="boot-splash-orbit orbit-a"></div>
+      <div class="boot-splash-orbit orbit-b"></div>
+      <div class="boot-splash-orbit orbit-c"></div>
+      <div class="boot-splash-core"></div>
+      <div class="boot-splash-pulse"></div>
+      <span class="boot-splash-shard shard-a"></span>
+      <span class="boot-splash-shard shard-b"></span>
+      <span class="boot-splash-shard shard-c"></span>
+      <span class="boot-splash-shard shard-d"></span>
+    </div>
+    <div class="boot-splash-copy">
+      <p class="boot-splash-eyebrow">SPHERICAL MEMORY</p>
+      <h1 id="boot-splash-title">Waking the memory sphere</h1>
+      <p id="boot-splash-detail" class="boot-splash-detail">Preparing the cover, media studio, and live 3D shard field.</p>
+      <div class="boot-splash-progress-track">
+        <div id="boot-splash-progress" class="boot-splash-progress-bar"></div>
+      </div>
+      <p id="boot-splash-meta" class="boot-splash-meta">0%</p>
+    </div>
+  `;
+  document.body.appendChild(splash);
+  document.body.dataset.boot = '1';
+  return splash;
+}
+
+function updateBootSplash() {
+  const splash = ensureBootSplash();
+  const titleEl = splash.querySelector('#boot-splash-title');
+  const detailEl = splash.querySelector('#boot-splash-detail');
+  const metaEl = splash.querySelector('#boot-splash-meta');
+  const progressEl = splash.querySelector('#boot-splash-progress');
+  const progress = Math.round((SM.loadingProgress || 0) * 100);
+  const loading = progress >= 100 ? 100 : Math.max(progress, 4);
+  const isZh = SM.lang === 'zh';
+
+  if (titleEl) {
+    titleEl.textContent = isZh ? '正在唤醒记忆球' : 'Waking the memory sphere';
+  }
+  if (detailEl) {
+    if (SM.appReady) {
+      detailEl.textContent = isZh
+        ? '首屏已就绪，正在把完整碎片球体验交给你。'
+        : 'The opening hero is ready and the full shard sphere is now unlocked.';
+    } else if (SM.bootReady) {
+      detailEl.textContent = isZh
+        ? '首屏已出现，后台继续构建 Three.js 碎片、粒子和材质动效。'
+        : 'The hero is live while Three.js shards, particles, and material motion finish in the background.';
+    } else {
+      detailEl.textContent = isZh
+        ? '先点亮封面与素材面板，再继续构建实时 3D 记忆球。'
+        : 'Bringing up the hero and media panel first, then the real-time 3D memory sphere.';
+    }
+  }
+  if (metaEl) {
+    metaEl.textContent = SM.appReady
+      ? (isZh ? '已完成 100%' : 'Ready 100%')
+      : `${loading}%`;
+  }
+  if (progressEl) {
+    progressEl.style.width = `${loading}%`;
+  }
+}
+
+function dismissBootSplash() {
+  const splash = document.getElementById('boot-splash');
+  if (!splash || splash.dataset.dismissed === '1') return;
+  splash.dataset.dismissed = '1';
+  document.body.dataset.boot = '0';
+  window.setTimeout(() => splash.remove(), 720);
+}
+
+function publishLoadingProgress(phase, loaded, total, label = '') {
+  SM.loadingPhase = phase;
+  SM.loadingProgress = total > 0 ? loaded / total : 1;
+  document.body.dataset.appReady = SM.appReady ? '1' : '0';
+  updateBootSplash();
+  SM.bus?.emit?.('app:loading-progress', {
+    phase,
+    loaded,
+    total,
+    progress: SM.loadingProgress,
+    label,
+  });
+}
+
+function yieldToBrowser() {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.setTimeout(resolve, 0);
+    });
+  });
+}
+
 function bindInputTargets() {
   const targets = [
     ['cover-container', 'cover'],
@@ -105,8 +215,12 @@ function bindInputTargets() {
   });
 }
 
-async function loadModules(sequence) {
-  for (const [category, name, loader] of sequence) {
+async function loadModules(sequence, options = {}) {
+  const total = options.total ?? sequence.length;
+  const offset = options.offset ?? 0;
+  const phase = options.phase ?? 'boot';
+
+  for (const [index, [category, name, loader]] of sequence.entries()) {
     try {
       const mod = await loader();
       if (!SM.modules[category]) SM.modules[category] = {};
@@ -123,6 +237,11 @@ async function loadModules(sequence) {
       console.log(`%c[SM] ok ${category}.${name}`, 'color:#88ff88');
     } catch (error) {
       console.warn(`[SM] skip ${category}.${name}:`, error?.message || error);
+    } finally {
+      publishLoadingProgress(phase, offset + index + 1, total, `${category}.${name}`);
+      if (options.yieldBetween) {
+        await yieldToBrowser();
+      }
     }
   }
 }
@@ -180,6 +299,7 @@ async function loadFallbackIfNeeded() {
 
 async function init() {
   console.log(`%c[SM] spherical-memory v${SM.version}`, 'color:#88ddff;font-weight:bold;font-size:14px');
+  ensureBootSplash();
 
   SM.bus = new EventBus();
   SM.state = new StateMachine(SM.bus);
@@ -194,8 +314,27 @@ async function init() {
   });
 
   bindInputTargets();
-  await loadModules(CORE_SEQUENCE);
+  const totalCoreModules = BOOT_SEQUENCE.length + EXPERIENCE_SEQUENCE.length;
+  publishLoadingProgress('boot', 0, totalCoreModules, 'boot');
+  await loadModules(BOOT_SEQUENCE, {
+    phase: 'boot',
+    total: totalCoreModules,
+    offset: 0,
+  });
+  SM.bootReady = true;
+  updateBootSplash();
+  SM.bus.emit('app:boot-ready');
+  dismissBootSplash();
+
+  await loadModules(EXPERIENCE_SEQUENCE, {
+    phase: 'experience',
+    total: totalCoreModules,
+    offset: BOOT_SEQUENCE.length,
+    yieldBetween: true,
+  });
   await loadFallbackIfNeeded();
+  SM.appReady = true;
+  publishLoadingProgress('ready', totalCoreModules, totalCoreModules, 'ready');
   queueDeferredModules();
 
   if (SM.debug) {
