@@ -479,6 +479,244 @@ body[data-state="share"] #upload-container {
   animation: ring-c-spin 110s linear infinite;
 }
 
+/* iOS 18 / visionOS dark-purple aurora planet.
+   The previous version stacked a few conic-gradients on a flat
+   radial body — that read as a sticker, not a sphere. This pass
+   builds the planet as a layered pseudo-shader:
+
+     layer 1   base body                — dark-purple radial, lit top-left
+     layer 2   cool pole highlight      — soft top-right white-blue wash
+     layer 3   hot equator band         — wide violet/pink stripe across
+                                          the planet's middle latitude
+     layer 4   aurora veil 1            — conic, magenta low-contrast
+                                          counter-rotating
+     layer 5   aurora veil 2            — conic, cyan/violet counter-
+                                          rotating the other way
+     layer 6   aurora curtain           — two narrow conic stripes (violet
+                                          + cyan) co-rotating with the
+                                          planet
+     layer 7   noise grain              — inline SVG turbulence to break
+                                          up the smooth gradients
+     layer 8   specular highlight       — top-left bright crescent
+     layer 9   rim glow                 — cold blue ring around the
+                                          bottom-right edge
+     layer 10  inner core glow          — small bright center
+
+   The result is a sphere that reads as lit, has visible latitude
+   bands, a faint noise grain (so it doesn't look like CSS), a moving
+   aurora, and a clear specular terminator — instead of a flat
+   radial blob. */
+.cover-hero-core {
+  width: 36%;
+  height: 36%;
+  border-radius: 50%;
+  background:
+    /* 1. inner core glow — small bright spot near top */
+    radial-gradient(circle at 40% 32%,
+      rgba(255, 220, 255, 0.42) 0%,
+      rgba(220, 160, 255, 0.18) 6%,
+      transparent 12%),
+
+    /* 2. specular highlight — top-left bright crescent (lit hemisphere) */
+    radial-gradient(ellipse 56% 38% at 32% 22%,
+      rgba(255, 240, 255, 0.55) 0%,
+      rgba(190, 180, 255, 0.32) 18%,
+      rgba(120, 100, 220, 0.18) 38%,
+      transparent 64%),
+
+    /* 3. cool pole highlight — top-right wash */
+    radial-gradient(ellipse 60% 40% at 70% 18%,
+      rgba(180, 220, 255, 0.36) 0%,
+      rgba(140, 160, 240, 0.18) 22%,
+      transparent 56%),
+
+    /* 4. hot equator band — wide violet/pink across the middle */
+    radial-gradient(ellipse 90% 22% at 50% 58%,
+      rgba(176, 102, 255, 0.55) 0%,
+      rgba(220, 120, 220, 0.34) 24%,
+      rgba(140, 80, 220, 0.18) 52%,
+      transparent 78%),
+
+    /* 5. aurora veil 1 — magenta low-contrast counter-rotating */
+    conic-gradient(from calc(var(--sm-shard-rot, 0deg) + 60deg) at 50% 50%,
+      rgba(255, 96, 196, 0)    0%,
+      rgba(255, 96, 196, 0.32) 14%,
+      rgba(176, 102, 255, 0.28) 30%,
+      rgba(255, 96, 196, 0)    46%,
+      rgba(120, 200, 255, 0.18) 64%,
+      rgba(255, 96, 196, 0)    82%,
+      rgba(255, 96, 196, 0)    100%),
+
+    /* 6. aurora veil 2 — cyan/violet the other way */
+    conic-gradient(from calc(var(--sm-shard-rot, 0deg) - 90deg) at 50% 50%,
+      rgba(120, 200, 255, 0)    0%,
+      rgba(120, 200, 255, 0.30) 18%,
+      rgba(176, 102, 255, 0.24) 36%,
+      rgba(120, 200, 255, 0)    54%,
+      rgba(255, 200, 120, 0.10) 72%,
+      rgba(120, 200, 255, 0)    100%),
+
+    /* 7. aurora curtain — narrow violet stripe co-rotating */
+    conic-gradient(from var(--sm-shard-rot, 0deg) at 50% 50%,
+      rgba(176, 102, 255, 0)    0%,
+      rgba(176, 102, 255, 0.46) 22%,
+      rgba(255, 255, 255, 0.16) 32%,
+      rgba(176, 102, 255, 0)    44%,
+      rgba(120, 200, 255, 0.36) 62%,
+      rgba(255, 200, 255, 0.18) 72%,
+      rgba(176, 102, 255, 0)    100%),
+
+    /* 8. base body — dark purple radial, lit top-left */
+    radial-gradient(circle at 36% 30%,
+      #6a4ab0 0%,
+      #4a2880 18%,
+      #2c1858 38%,
+      #160a30 62%,
+      #08041a 86%,
+      #03020a 100%);
+  box-shadow:
+    /* rim light — cold blue, bottom-right edge of the planet */
+    inset -8px -10px 24px rgba(120, 200, 255, 0.42),
+    inset -16px -18px 40px rgba(80, 160, 220, 0.18),
+    /* terminator shadow — right edge, dark */
+    inset 10px -6px 22px rgba(8, 4, 22, 0.55),
+    /* top-left warm magenta highlight inside */
+    inset 5px 7px 20px rgba(255, 130, 220, 0.26),
+    /* atmospheric glow, primary */
+    0 0 36px rgba(176, 102, 255, 0.62),
+    /* atmospheric glow, secondary wider */
+    0 0 84px rgba(110, 76, 220, 0.42),
+    /* outermost falloff */
+    0 0 140px rgba(60, 36, 120, 0.26);
+  animation:
+    boot-core 8s ease-in-out infinite,
+    cover-shard-orbit 90s linear infinite;
+  will-change: transform, background;
+}
+
+/* The pseudo-element sits on top of the planet and applies a turbulence
+   noise mask. The noise itself is generated inline as an SVG data-url
+   so the planet breaks out of the smooth-gradient look without needing
+   a JS-driven WebGL shader. */
+.cover-hero-core::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    /* terminator darkening on the right edge */
+    radial-gradient(circle at 30% 28%,
+      transparent 0%,
+      transparent 32%,
+      rgba(8, 4, 22, 0.42) 78%,
+      rgba(8, 4, 22, 0.72) 100%),
+    /* fine high-frequency grain — pixel-level sparkle, what an
+       aurora planet shows at close range. baseFrequency=1.6 numOctaves=2. */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='2' seed='2'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.14 0'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>"),
+    /* Turbulence-based fractal noise via SVG <feTurbulence>. We use
+       baseFrequency=0.22 with 5 octaves to get the same large-scale
+       continent-like clumping a real FBM shader would produce — not
+       the high-frequency pixel-grain you get from baseFrequency=0.85.
+       The matrix tints the grayscale noise into the planet's violet
+       range so it blends with the conic-gradient aurora layers. */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.22' numOctaves='5' seed='7'/><feColorMatrix values='0 0 0 0 0.62  0 0 0 0 0.32  0 0 0 0 0.95  0 0 0 0.42 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  mix-blend-mode: overlay;
+  opacity: 0.55;
+  pointer-events: none;
+  /* The noise stays still relative to the planet — only the
+     conic-gradient aurora bands rotate with --sm-shard-rot. The
+     terminator shadow that darkens the right edge lives in this
+     layer too. */
+  animation: cover-shard-orbit 90s linear infinite;
+}
+
+/* A second pseudo-element on the planet layers thin latitude bands
+   (parallels) to suggest a 3D sphere with continent-like markings.
+   These are very low-contrast, so the planet still reads as smooth
+   at a glance but reveals more detail when you look closely — the
+   trick real aurora planets use to look lit. */
+.cover-hero-core::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    /* north pole brightening */
+    radial-gradient(ellipse 60% 14% at 50% 4%,
+      rgba(220, 230, 255, 0.22) 0%,
+      transparent 70%),
+    /* south pole dimming */
+    radial-gradient(ellipse 60% 14% at 50% 96%,
+      rgba(8, 4, 22, 0.55) 0%,
+      transparent 70%),
+    /* 2 narrow latitude bands at +28° and -28° to suggest continents */
+    linear-gradient(180deg,
+      transparent 0%, transparent 38%,
+      rgba(176, 102, 255, 0.16) 46%, rgba(120, 200, 255, 0.10) 54%, transparent 60%,
+      transparent 100%),
+    /* faint equator shadow */
+    linear-gradient(180deg,
+      transparent 0%, transparent 60%,
+      rgba(8, 4, 22, 0.18) 70%, transparent 80%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+/* When the cover-hero-core is hosting the WebGL planet, drop the CSS
+   background, the noise pseudo-elements, and the inset shadows. The
+   shader handles base body, noise grain, latitude bands, specular,
+   and rim glow on its own. We keep the outer halo (drop-shadow) so
+   the atmospheric bloom around the planet still reads. */
+.cover-hero-core[data-mode="webgl"] {
+  background: transparent !important;
+  box-shadow:
+    0 0 36px rgba(176, 102, 255, 0.62),
+    0 0 84px rgba(110, 76, 220, 0.42),
+    0 0 140px rgba(60, 36, 120, 0.26) !important;
+  /* Sit the canvas at z-index 0 inside the host. The cover-hero-shards
+     and cover-hero-halo live in sibling elements above the host, so
+     they naturally stack on top of the WebGL canvas. */
+}
+
+.cover-hero-core[data-mode="webgl"]::before,
+.cover-hero-core[data-mode="webgl"]::after {
+  display: none;
+}
+
+/* The WebGL canvas is absolutely positioned inside the host. We keep
+   the same border-radius as the host so the planet stays round even
+   if the browser reports a non-square pixel ratio. */
+.cover-hero-canvas {
+  display: block;
+  border-radius: 50%;
+  mix-blend-mode: normal;
+}
+
+/* When the WebGL planet is active, push the CSS halo (which sits
+   before the host in the DOM and would otherwise blur the planet)
+   behind everything in the host, and dim it. The shader's rim glow
+   plus the host's outer box-shadow carry the atmospheric bloom on
+   their own. */
+.cover-hero:has(.cover-hero-core[data-mode="webgl"]) .cover-hero-halo {
+  z-index: -1;
+  opacity: 0.42;
+  filter: blur(28px);
+}
+.cover-hero:has(.cover-hero-core[data-mode="webgl"]) .cover-hero-shards,
+.cover-hero:has(.cover-hero-core[data-mode="webgl"]) .cover-hero-rings {
+  z-index: 2;
+}
+.cover-hero:has(.cover-hero-core[data-mode="webgl"]) .cover-hero-core {
+  z-index: 1;
+}
+
+.cover-hero-ring.ring-c {
+  width: 92%;
+  height: 92%;
+  transform: translate(-50%, -50%) rotateY(68deg);
+  animation: ring-c-spin 110s linear infinite;
+}
+
 .cover-hero-ring.ring-b {
   width: 76%;
   height: 76%;
@@ -1364,13 +1602,19 @@ body[data-state="share"] #upload-container {
 }
 
 @keyframes boot-core {
-  0%,
-  100% {
-    transform: translate(-50%, -50%) scale(0.96);
+  /* 12s breathing + tumbling. The continuous Y rotation makes the
+     asymmetric noise grain and aurora bands appear to drift over
+     the sphere surface, so the planet reads as a real rotating
+     planet rather than a static sticker. The X tilt adds a subtle
+     wobble that makes the rotation axis less obvious. */
+  0% {
+    transform: translate(-50%, -50%) rotateY(0deg) rotateX(-2deg) scale(0.96);
   }
-
   50% {
-    transform: translate(-50%, -50%) scale(1.05);
+    transform: translate(-50%, -50%) rotateY(180deg) rotateX(2deg) scale(1.05);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotateY(360deg) rotateX(-2deg) scale(0.96);
   }
 }
 
