@@ -51,10 +51,18 @@ const EXPERIENCE_SEQUENCE = [
   ['render3d', 'envMap', () => import('../render3d/env-map.js')],
   ['anim', 'mirrorCrack', () => import('../anim/mirror-crack.js')],
   ['anim', 'mirrorShards', () => import('../anim/mirror-shards.js')],
+  ['anim', 'shockwave', () => import('../anim/shockwave.js')],
   ['anim', 'aggregate', () => import('../anim/aggregate.js')],
   ['anim', 'shardRotate', () => import('../anim/shard-rotate.js')],
   ['anim', 'shardInteract', () => import('../anim/shard-interact.js')],
   ['anim', 'breath', () => import('../anim/breath.js')],
+  ['render3d', 'flowField', () => import('../render3d/flow-field.js')],
+  ['render3d', 'galaxyInner', () => import('../render3d/galaxy-inner.js')],
+  ['render3d', 'ribbonTrail', () => import('../render3d/ribbon-trail.js')],
+  ['render3d', 'selectionRipple', () => import('../render3d/selection-ripple.js')],
+  ['render3d', 'gpgpuCloud', () => import('../render3d/gpgpu-cloud.js')],
+  ['render3d', 'textRibbon', () => import('../render3d/text-ribbon.js')],
+  ['render3d', 'carousel', () => import('../render3d/carousel.js')],
   ['input', 'keyboardShortcuts', () => import('../input/keyboard-shortcuts.js')],
   ['ui', 'hud', () => import('../ui/hud.js')],
   ['ui', 'memoryCard', () => import('../ui/memory-card.js')],
@@ -70,6 +78,7 @@ const DEFERRED_SEQUENCE = [
   ['output', 'recorder', () => import('../output/recorder.js')],
   ['output', 'dedication', () => import('../output/dedication.js')],
   ['audio', 'soundFx', () => import('../audio/sound-fx.js')],
+  ['render3d', 'spectrumRing', () => import('../render3d/spectrum-ring.js')],
 ];
 
 function detectWebGL() {
