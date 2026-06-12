@@ -112,7 +112,13 @@ body[data-state="share"] #hud-container {
   display: block;
 }
 
-body[data-state="cover"] #upload-container,
+/* Upload panel is a floating media-library surface; only useful once the
+   user is past the cover. On cover it would sit on top of the hero card
+   and make the page look broken. */
+body[data-state="cover"] #upload-container {
+  display: none;
+}
+
 body[data-state="mirror"] #upload-container,
 body[data-state="sphere"] #upload-container,
 body[data-state="share"] #upload-container {
