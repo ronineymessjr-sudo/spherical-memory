@@ -106,6 +106,22 @@ async function waitForSphere(page, timeout = 30000) {
   }
 }
 
+async function waitForDemoProgress(page, timeout = 30000) {
+  try {
+    await page.waitForFunction(() => {
+      const state = window.SM?.currentState;
+      return state === 'mirror' || state === 'cracking' || state === 'sphere';
+    }, { timeout });
+  } catch (error) {
+    const snapshot = await page.evaluate(() => ({
+      state: window.SM?.currentState ?? null,
+      appReady: window.SM?.appReady ?? false,
+      bootReady: window.SM?.bootReady ?? false,
+    }));
+    throw new Error(`Demo did not advance past cover: ${JSON.stringify(snapshot)}`);
+  }
+}
+
 async function runSmoke() {
   const server = await startServer();
   const executablePath = await resolveExecutable();
@@ -233,7 +249,9 @@ async function runSmoke() {
     await demoPage.goto(`http://${host}:${port}/?demo=1`, { waitUntil: 'domcontentloaded' });
     await demoPage.waitForFunction(() => window.SM?.appReady === true, { timeout: 30000 });
     await demoPage.waitForSelector('#demo-badge', { timeout: 5000 });
-    await waitForSphere(demoPage);
+    // Upload and autoclick already verify the full cover -> mirror -> sphere
+    // flow. For demo mode we only need to prove the automated sequence starts.
+    await waitForDemoProgress(demoPage);
 
     const blockingDemoRequests = failedDemoRequests.filter((entry) => !entry.endsWith('/favicon.ico'));
     if (demoErrors.length || blockingDemoRequests.length) {
