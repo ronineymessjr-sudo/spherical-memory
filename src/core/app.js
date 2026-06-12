@@ -360,6 +360,7 @@ async function init() {
   }
 
   SM.bus.emit('app:ready');
+  SM.appReady = true;
   console.log('%c[SM] ready', 'color:#88ddff;font-weight:bold');
 }
 

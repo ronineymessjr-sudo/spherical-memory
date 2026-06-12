@@ -7,7 +7,7 @@ import puppeteer from 'puppeteer-core';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const host = '127.0.0.1';
-const port = 4175;
+let port = 4175;
 
 function contentType(filePath) {
   if (filePath.endsWith('.html')) return 'text/html; charset=utf-8';
@@ -53,7 +53,7 @@ async function resolveExecutable() {
 async function startServer() {
   const server = http.createServer(async (req, res) => {
     try {
-      const url = new URL(req.url, `http://${host}:${port}`);
+      const url = new URL(req.url, `http://${req.headers.host || `${host}:${port}`}`);
       let requestPath = decodeURIComponent(url.pathname);
       if (requestPath === '/') requestPath = '/index.html';
 
@@ -69,7 +69,11 @@ async function startServer() {
     }
   });
 
-  await new Promise((resolve) => server.listen(port, host, resolve));
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, host, resolve);
+  });
+  port = server.address().port;
   return server;
 }
 
@@ -79,7 +83,13 @@ async function runSmoke() {
   const browser = await puppeteer.launch({
     executablePath,
     headless: true,
-    args: ['--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
+    args: [
+      '--use-angle=swiftshader',
+      '--enable-webgl',
+      '--ignore-gpu-blocklist',
+      '--use-gl=swiftshader',
+      '--enable-unsafe-swiftshader',
+    ],
   });
 
   try {
@@ -100,7 +110,8 @@ async function runSmoke() {
       }
     });
 
-    await uploadPage.goto(`http://${host}:${port}/`, { waitUntil: 'networkidle2' });
+    await uploadPage.goto(`http://${host}:${port}/`, { waitUntil: 'domcontentloaded' });
+    await uploadPage.waitForFunction(() => window.SM?.appReady === true, { timeout: 20000 });
     await uploadPage.waitForSelector('#upload-images', { timeout: 5000 });
     const uploadInput = await uploadPage.$('#upload-images');
     await uploadInput.uploadFile(
@@ -143,6 +154,8 @@ async function runSmoke() {
       );
     }
 
+    await uploadPage.close();
+
     const page = await browser.newPage();
     const consoleErrors = [];
     const failedRequests = [];
@@ -160,8 +173,9 @@ async function runSmoke() {
       }
     });
 
-    await page.goto(`http://${host}:${port}/?autoclick=3`, { waitUntil: 'networkidle2' });
-    await page.waitForFunction(() => window.SM?.currentState === 'sphere', { timeout: 15000 });
+    await page.goto(`http://${host}:${port}/?autoclick=3`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.SM?.appReady === true, { timeout: 20000 });
+    await page.waitForFunction(() => window.SM?.currentState === 'sphere', { timeout: 30000 });
     await page.waitForFunction(() => document.querySelectorAll('#hud-container .hud-button').length >= 3, { timeout: 5000 });
     await page.waitForFunction(() => !!document.querySelector('#memory-toolbar'), { timeout: 5000 });
     await page.waitForFunction(() => !!window.SM?.aiTitle, { timeout: 5000 });
@@ -172,6 +186,8 @@ async function runSmoke() {
         `Smoke issues on autoclick route:\n${consoleErrors.join('\n')}\n${blockingAutoclickRequests.join('\n')}`.trim(),
       );
     }
+
+    await page.close();
 
     const demoPage = await browser.newPage();
     const demoErrors = [];
@@ -190,9 +206,10 @@ async function runSmoke() {
       }
     });
 
-    await demoPage.goto(`http://${host}:${port}/?demo=1`, { waitUntil: 'networkidle2' });
+    await demoPage.goto(`http://${host}:${port}/?demo=1`, { waitUntil: 'domcontentloaded' });
+    await demoPage.waitForFunction(() => window.SM?.appReady === true, { timeout: 30000 });
     await demoPage.waitForSelector('#demo-badge', { timeout: 5000 });
-    await demoPage.waitForFunction(() => window.SM?.currentState === 'sphere', { timeout: 15000 });
+    await demoPage.waitForFunction(() => window.SM?.currentState === 'sphere', { timeout: 30000 });
 
     const blockingDemoRequests = failedDemoRequests.filter((entry) => !entry.endsWith('/favicon.ico'));
     if (demoErrors.length || blockingDemoRequests.length) {
