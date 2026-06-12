@@ -77,10 +77,8 @@ async function startServer() {
   return server;
 }
 
-async function runSmoke() {
-  const server = await startServer();
-  const executablePath = await resolveExecutable();
-  const browser = await puppeteer.launch({
+async function launchBrowser(executablePath) {
+  return puppeteer.launch({
     executablePath,
     headless: true,
     args: [
@@ -91,8 +89,15 @@ async function runSmoke() {
       '--enable-unsafe-swiftshader',
     ],
   });
+}
+
+async function runSmoke() {
+  const server = await startServer();
+  const executablePath = await resolveExecutable();
+  let browser = null;
 
   try {
+    browser = await launchBrowser(executablePath);
     const uploadPage = await browser.newPage();
     const uploadErrors = [];
     const failedUploadRequests = [];
@@ -155,6 +160,8 @@ async function runSmoke() {
     }
 
     await uploadPage.close();
+    await browser.close();
+    browser = await launchBrowser(executablePath);
 
     const page = await browser.newPage();
     const consoleErrors = [];
@@ -188,6 +195,8 @@ async function runSmoke() {
     }
 
     await page.close();
+    await browser.close();
+    browser = await launchBrowser(executablePath);
 
     const demoPage = await browser.newPage();
     const demoErrors = [];
@@ -220,7 +229,9 @@ async function runSmoke() {
 
     console.log('Smoke checks passed for ?autoclick=3 and ?demo=1');
   } finally {
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
     await new Promise((resolve) => server.close(resolve));
   }
 }
