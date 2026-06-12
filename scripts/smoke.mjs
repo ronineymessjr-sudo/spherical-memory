@@ -91,6 +91,21 @@ async function launchBrowser(executablePath) {
   });
 }
 
+async function waitForSphere(page, timeout = 30000) {
+  try {
+    await page.waitForFunction(() => window.SM?.currentState === 'sphere', { timeout });
+  } catch (error) {
+    const snapshot = await page.evaluate(() => ({
+      state: window.SM?.currentState ?? null,
+      renderMode: window.SM?.renderMode ?? null,
+      appReady: window.SM?.appReady ?? false,
+      bootReady: window.SM?.bootReady ?? false,
+      webglOK: window.SM?.webglOK ?? false,
+    }));
+    throw new Error(`Sphere transition timed out: ${JSON.stringify(snapshot)}`);
+  }
+}
+
 async function runSmoke() {
   const server = await startServer();
   const executablePath = await resolveExecutable();
@@ -140,7 +155,7 @@ async function runSmoke() {
       tap();
     });
 
-    await uploadPage.waitForFunction(() => window.SM?.currentState === 'sphere', { timeout: 15000 });
+    await waitForSphere(uploadPage);
     await uploadPage.waitForFunction(() => {
       return window.SM?.modules?.render3d?.shardMesh?.getShards?.()
         ?.some((shard) => shard.mesh.userData.materialType === 'video');
@@ -182,7 +197,7 @@ async function runSmoke() {
 
     await page.goto(`http://${host}:${port}/?autoclick=3`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.SM?.appReady === true, { timeout: 20000 });
-    await page.waitForFunction(() => window.SM?.currentState === 'sphere', { timeout: 30000 });
+    await waitForSphere(page);
     await page.waitForFunction(() => document.querySelectorAll('#hud-container .hud-button').length >= 3, { timeout: 5000 });
     await page.waitForFunction(() => !!document.querySelector('#memory-toolbar'), { timeout: 5000 });
     await page.waitForFunction(() => !!window.SM?.aiTitle, { timeout: 5000 });
@@ -218,7 +233,7 @@ async function runSmoke() {
     await demoPage.goto(`http://${host}:${port}/?demo=1`, { waitUntil: 'domcontentloaded' });
     await demoPage.waitForFunction(() => window.SM?.appReady === true, { timeout: 30000 });
     await demoPage.waitForSelector('#demo-badge', { timeout: 5000 });
-    await demoPage.waitForFunction(() => window.SM?.currentState === 'sphere', { timeout: 30000 });
+    await waitForSphere(demoPage);
 
     const blockingDemoRequests = failedDemoRequests.filter((entry) => !entry.endsWith('/favicon.ico'));
     if (demoErrors.length || blockingDemoRequests.length) {

@@ -18,6 +18,7 @@ let running = false;
 const REVEAL_TOTAL = 1320; // ms
 const REVEAL_START = 0.30; // fraction of imprint phase during which shards start fading in
 const REVEAL_END = 0.92;
+const FALLBACK_TRANSITION = 420;
 
 function animateShardReveal() {
   const shardMesh = window.SM.modules.render3d?.shardMesh;
@@ -53,31 +54,45 @@ function clamp01(value) {
   return Math.min(1, Math.max(0, value));
 }
 
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
 async function play() {
   if (running) return;
   running = true;
 
   const shardMesh = window.SM.modules.render3d?.shardMesh;
-  if (!shardMesh) {
+  try {
+    if (!shardMesh || window.SM.renderMode === '2d') {
+      await wait(FALLBACK_TRANSITION);
+      window.SM.bus.emit('aggregate:done', { fallback: true });
+      return;
+    }
+
+    // Hold shards barely visible during the vaporize phase.
+    shardMesh.setOpacityScale?.(0.18);
+    // Quick outward pop.
+    await shardMesh.explode(280);
+    // Tell ion-particles to start homing in (imprint).
+    window.SM.bus.emit('aggregate:fuse-start', {});
+    // Run aggregation motion + opacity reveal in parallel so particles still float
+    // around them while they snap into place.
+    await Promise.all([
+      shardMesh.aggregate(1320),
+      animateShardReveal(),
+    ]);
+
+    window.SM.bus.emit('aggregate:done', {});
+  } catch (error) {
+    console.warn('[aggregate] falling back to sphere transition:', error);
+    await wait(FALLBACK_TRANSITION);
+    window.SM.bus.emit('aggregate:done', { fallback: true });
+  } finally {
     running = false;
-    return;
   }
-
-  // Hold shards barely visible during the vaporize phase.
-  shardMesh.setOpacityScale?.(0.18);
-  // Quick outward pop.
-  await shardMesh.explode(280);
-  // Tell ion-particles to start homing in (imprint).
-  window.SM.bus.emit('aggregate:fuse-start', {});
-  // Run aggregation motion + opacity reveal in parallel so particles still float
-  // around them while they snap into place.
-  await Promise.all([
-    shardMesh.aggregate(1320),
-    animateShardReveal(),
-  ]);
-
-  running = false;
-  window.SM.bus.emit('aggregate:done', {});
 }
 
 function init() {
