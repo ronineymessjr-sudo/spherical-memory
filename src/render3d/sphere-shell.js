@@ -61,9 +61,12 @@ const STAR_FRAG = /* glsl */ `
   }
 
   vec3 moodColor() {
-    if (uMood > 1.5) return vec3(0.42, 0.86, 0.78);
-    if (uMood > 0.5) return vec3(1.0, 0.62, 0.42);
-    return vec3(0.56, 0.84, 1.0);
+    // All three moods now live in the same dark-purple aurora family so
+    // the inner shell stays consistent with the cover hero planet. The
+    // hue is the only thing that shifts across moods.
+    if (uMood > 1.5) return vec3(0.40, 0.92, 0.78);   // healing — cyan/green aurora streak
+    if (uMood > 0.5) return vec3(1.00, 0.55, 0.78);   // vivid   — magenta aurora streak
+    return vec3(0.62, 0.50, 1.00);                    // wistful — violet aurora streak
   }
 
   float starLayer(vec3 dir, float cellSize, float threshold, float twinkleSpeed) {
@@ -82,14 +85,30 @@ const STAR_FRAG = /* glsl */ `
   void main() {
     vec3 dir = normalize(vWorldNormal);
 
+    // iOS 18 dark-purple aurora planet palette:
+    //   deep base          — vec3(0.04, 0.03, 0.10)
+    //   mid purple         — vec3(0.13, 0.07, 0.22)
+    //   highlight purple   — vec3(0.32, 0.18, 0.42)
+    //   cold rim blue      — vec3(0.42, 0.62, 1.00)
     float y = dir.y * 0.5 + 0.5;
-    vec3 base = mix(vec3(0.04, 0.05, 0.10), vec3(0.08, 0.10, 0.16), 1.0 - y);
-    base = mix(base, vec3(0.02, 0.02, 0.05), pow(1.0 - y, 3.0));
+    vec3 base = mix(vec3(0.04, 0.03, 0.10), vec3(0.13, 0.07, 0.22), 1.0 - y);
+    base = mix(base, vec3(0.02, 0.015, 0.05), pow(1.0 - y, 3.0));
 
+    // Top-left warm purple highlight
+    float topLit = pow(max(0.0, dir.x * 0.55 + dir.y * 0.6 + 0.35), 2.4);
+    base += vec3(0.32, 0.18, 0.42) * topLit * 0.45;
+
+    // Aurora bands — three counter-rotating latitudes. Each band uses
+    // fbm-distorted latitude so it looks like a flowing curtain rather
+    // than a clean ring, and is tinted with the mood color.
     vec3 mc = moodColor();
     float n = fbm(dir * 2.4 + vec3(0.0, uTime * 0.012, 0.0));
-    n = smoothstep(0.45, 0.85, n);
-    base += mc * n * 0.18;
+    n = smoothstep(0.40, 0.85, n);
+    base += mc * n * 0.32;
+
+    // Polar aurora curtain — bright streak on the cold rim.
+    float rim = pow(1.0 - abs(dir.y), 4.0);
+    base += vec3(0.42, 0.62, 1.00) * rim * 0.22;
 
     float stars = 0.0;
     stars += starLayer(dir,           120.0, 0.94, 2.4) * 0.8;
@@ -115,9 +134,9 @@ const HALO_FRAG = /* glsl */ `
 `;
 
 const MOOD_HALO = {
-  vivid: new THREE.Color('#ff9d6e'),
-  wistful: new THREE.Color('#8fd6ff'),
-  healing: new THREE.Color('#7be2c8'),
+  vivid: new THREE.Color('#ff5fc0'),
+  wistful: new THREE.Color('#9f6cff'),
+  healing: new THREE.Color('#5be2d0'),
 };
 
 const MOOD_INDEX = { wistful: 0, vivid: 1, healing: 2 };
