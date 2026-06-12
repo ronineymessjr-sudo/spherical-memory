@@ -81,6 +81,8 @@ const DEFERRED_SEQUENCE = [
   ['render3d', 'spectrumRing', () => import('../render3d/spectrum-ring.js')],
 ];
 
+let bootSplashClosed = false;
+
 function detectWebGL() {
   try {
     const canvas = document.createElement('canvas');
@@ -107,6 +109,8 @@ function applyStateToDom(nextState) {
 }
 
 function ensureBootSplash() {
+  if (bootSplashClosed) return null;
+
   let splash = document.getElementById('boot-splash');
   if (splash) return splash;
 
@@ -142,7 +146,8 @@ function ensureBootSplash() {
 }
 
 function updateBootSplash() {
-  const splash = ensureBootSplash();
+  const splash = document.getElementById('boot-splash') ?? ensureBootSplash();
+  if (!splash) return;
   const titleEl = splash.querySelector('#boot-splash-title');
   const detailEl = splash.querySelector('#boot-splash-detail');
   const metaEl = splash.querySelector('#boot-splash-meta');
@@ -181,6 +186,7 @@ function updateBootSplash() {
 
 function dismissBootSplash() {
   const splash = document.getElementById('boot-splash');
+  bootSplashClosed = true;
   if (!splash || splash.dataset.dismissed === '1') return;
   splash.dataset.dismissed = '1';
   document.body.dataset.boot = '0';
