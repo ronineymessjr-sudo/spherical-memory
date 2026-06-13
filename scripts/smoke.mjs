@@ -6,6 +6,7 @@ import puppeteer from 'puppeteer-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
+const distDir = path.join(rootDir, 'dist');
 const host = '127.0.0.1';
 let port = 4175;
 
@@ -20,6 +21,15 @@ function contentType(filePath) {
   if (filePath.endsWith('.mp4')) return 'video/mp4';
   if (filePath.endsWith('.json')) return 'application/json; charset=utf-8';
   return 'application/octet-stream';
+}
+
+async function fileExists(targetPath) {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function resolveExecutable() {
@@ -51,6 +61,7 @@ async function resolveExecutable() {
 }
 
 async function startServer() {
+  const serveDir = await fileExists(path.join(distDir, 'index.html')) ? distDir : rootDir;
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, `http://${req.headers.host || `${host}:${port}`}`);
@@ -58,7 +69,7 @@ async function startServer() {
       if (requestPath === '/') requestPath = '/index.html';
 
       const normalized = path.normalize(requestPath).replace(/^(\.\.[/\\])+/, '');
-      const filePath = path.join(rootDir, normalized);
+      const filePath = path.join(serveDir, normalized);
       const fileBuffer = await fs.readFile(filePath);
 
       res.writeHead(200, { 'Content-Type': contentType(filePath) });
@@ -126,6 +137,7 @@ async function runSmoke() {
   const server = await startServer();
   const executablePath = await resolveExecutable();
   let browser = null;
+  const failedDynamicImports = [];
 
   try {
     browser = await launchBrowser(executablePath);
@@ -135,6 +147,9 @@ async function runSmoke() {
     uploadPage.on('console', (msg) => {
       if (msg.type() === 'error') {
         uploadErrors.push(msg.text());
+      }
+      if (msg.text().includes('Failed to fetch dynamically imported module')) {
+        failedDynamicImports.push(msg.text());
       }
     });
     uploadPage.on('pageerror', (error) => {
@@ -184,9 +199,9 @@ async function runSmoke() {
     }));
 
     const blockingUploadRequests = failedUploadRequests.filter((entry) => !entry.endsWith('/favicon.ico'));
-    if (uploadErrors.length || blockingUploadRequests.length || !uploadSnapshot.hasVideo) {
+    if (uploadErrors.length || blockingUploadRequests.length || failedDynamicImports.length || !uploadSnapshot.hasVideo) {
       throw new Error(
-        `Smoke issues on upload route:\n${uploadErrors.join('\n')}\n${blockingUploadRequests.join('\n')}\n${JSON.stringify(uploadSnapshot)}`.trim(),
+        `Smoke issues on upload route:\n${uploadErrors.join('\n')}\n${blockingUploadRequests.join('\n')}\n${failedDynamicImports.join('\n')}\n${JSON.stringify(uploadSnapshot)}`.trim(),
       );
     }
 
@@ -200,6 +215,9 @@ async function runSmoke() {
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
         consoleErrors.push(msg.text());
+      }
+      if (msg.text().includes('Failed to fetch dynamically imported module')) {
+        failedDynamicImports.push(msg.text());
       }
     });
     page.on('pageerror', (error) => {
@@ -219,9 +237,9 @@ async function runSmoke() {
     await page.waitForFunction(() => !!window.SM?.aiTitle, { timeout: 5000 });
 
     const blockingAutoclickRequests = failedRequests.filter((entry) => !entry.endsWith('/favicon.ico'));
-    if (consoleErrors.length || blockingAutoclickRequests.length) {
+    if (consoleErrors.length || blockingAutoclickRequests.length || failedDynamicImports.length) {
       throw new Error(
-        `Smoke issues on autoclick route:\n${consoleErrors.join('\n')}\n${blockingAutoclickRequests.join('\n')}`.trim(),
+        `Smoke issues on autoclick route:\n${consoleErrors.join('\n')}\n${blockingAutoclickRequests.join('\n')}\n${failedDynamicImports.join('\n')}`.trim(),
       );
     }
 
@@ -235,6 +253,9 @@ async function runSmoke() {
     demoPage.on('console', (msg) => {
       if (msg.type() === 'error') {
         demoErrors.push(msg.text());
+      }
+      if (msg.text().includes('Failed to fetch dynamically imported module')) {
+        failedDynamicImports.push(msg.text());
       }
     });
     demoPage.on('pageerror', (error) => {
@@ -254,9 +275,9 @@ async function runSmoke() {
     await waitForDemoProgress(demoPage);
 
     const blockingDemoRequests = failedDemoRequests.filter((entry) => !entry.endsWith('/favicon.ico'));
-    if (demoErrors.length || blockingDemoRequests.length) {
+    if (demoErrors.length || blockingDemoRequests.length || failedDynamicImports.length) {
       throw new Error(
-        `Smoke issues on demo route:\n${demoErrors.join('\n')}\n${blockingDemoRequests.join('\n')}`.trim(),
+        `Smoke issues on demo route:\n${demoErrors.join('\n')}\n${blockingDemoRequests.join('\n')}\n${failedDynamicImports.join('\n')}`.trim(),
       );
     }
 

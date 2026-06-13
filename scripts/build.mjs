@@ -5,6 +5,8 @@ const rootDir = path.resolve(process.cwd());
 const distDir = path.join(rootDir, 'dist');
 const threeSource = path.join(rootDir, 'node_modules', 'three', 'build', 'three.module.js');
 const threeDist = path.join(distDir, 'node_modules', 'three', 'build', 'three.module.js');
+const threeExamplesSource = path.join(rootDir, 'node_modules', 'three', 'examples');
+const threeExamplesDist = path.join(distDir, 'node_modules', 'three', 'examples');
 const requiredPaths = [
   'index.html',
   'src/core/app.js',
@@ -14,6 +16,8 @@ const requiredPaths = [
   'src/anim/aggregate.js',
   'src/demo/mode.js',
   'assets/fallback/memory-01.svg',
+  'node_modules/three/examples/jsm/postprocessing/EffectComposer.js',
+  'node_modules/three/examples/fonts/helvetiker_bold.typeface.json',
 ];
 
 async function exists(target) {
@@ -55,4 +59,5 @@ await fs.rm(distDir, { recursive: true, force: true });
 await copyDirectory(rootDir, distDir);
 await fs.mkdir(path.dirname(threeDist), { recursive: true });
 await fs.copyFile(threeSource, threeDist);
+await copyDirectory(threeExamplesSource, threeExamplesDist);
 console.log(`Build artifact prepared at ${distDir}`);
