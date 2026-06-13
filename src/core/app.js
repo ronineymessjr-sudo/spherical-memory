@@ -38,7 +38,7 @@ const BOOT_SEQUENCE = [
   ['ui', 'mirror', () => import('../ui/mirror.js')],
 ];
 
-const EXPERIENCE_SEQUENCE = [
+const INTERACTIVE_SEQUENCE = [
   ['render3d', 'scene', () => import('../render3d/scene.js')],
   ['render3d', 'sphereShell', () => import('../render3d/sphere-shell.js')],
   ['render3d', 'shardMesh', () => import('../render3d/shard-mesh.js')],
@@ -47,8 +47,6 @@ const EXPERIENCE_SEQUENCE = [
   ['render3d', 'panoramaBind', () => import('../render3d/panorama-bind.js')],
   ['render3d', 'shardFocusTick', () => import('../render3d/shard-focus-tick.js')],
   ['render3d', 'materialTheme', () => import('../render3d/material-theme.js')],
-  ['render3d', 'postFx', () => import('../render3d/post-fx.js')],
-  ['render3d', 'envMap', () => import('../render3d/env-map.js')],
   ['anim', 'mirrorCrack', () => import('../anim/mirror-crack.js')],
   ['anim', 'mirrorShards', () => import('../anim/mirror-shards.js')],
   ['anim', 'shockwave', () => import('../anim/shockwave.js')],
@@ -56,13 +54,6 @@ const EXPERIENCE_SEQUENCE = [
   ['anim', 'shardRotate', () => import('../anim/shard-rotate.js')],
   ['anim', 'shardInteract', () => import('../anim/shard-interact.js')],
   ['anim', 'breath', () => import('../anim/breath.js')],
-  ['render3d', 'flowField', () => import('../render3d/flow-field.js')],
-  ['render3d', 'galaxyInner', () => import('../render3d/galaxy-inner.js')],
-  ['render3d', 'ribbonTrail', () => import('../render3d/ribbon-trail.js')],
-  ['render3d', 'selectionRipple', () => import('../render3d/selection-ripple.js')],
-  ['render3d', 'gpgpuCloud', () => import('../render3d/gpgpu-cloud.js')],
-  ['render3d', 'textRibbon', () => import('../render3d/text-ribbon.js')],
-  ['render3d', 'carousel', () => import('../render3d/carousel.js')],
   ['input', 'keyboardShortcuts', () => import('../input/keyboard-shortcuts.js')],
   ['ui', 'hud', () => import('../ui/hud.js')],
   ['ui', 'memoryCard', () => import('../ui/memory-card.js')],
@@ -72,6 +63,18 @@ const EXPERIENCE_SEQUENCE = [
   ['demo', 'mode', () => import('../demo/mode.js')],
 ];
 
+const ENHANCEMENT_SEQUENCE = [
+  ['render3d', 'postFx', () => import('../render3d/post-fx.js')],
+  ['render3d', 'envMap', () => import('../render3d/env-map.js')],
+  ['render3d', 'flowField', () => import('../render3d/flow-field.js')],
+  ['render3d', 'galaxyInner', () => import('../render3d/galaxy-inner.js')],
+  ['render3d', 'ribbonTrail', () => import('../render3d/ribbon-trail.js')],
+  ['render3d', 'selectionRipple', () => import('../render3d/selection-ripple.js')],
+  ['render3d', 'gpgpuCloud', () => import('../render3d/gpgpu-cloud.js')],
+  ['render3d', 'textRibbon', () => import('../render3d/text-ribbon.js')],
+  ['render3d', 'carousel', () => import('../render3d/carousel.js')],
+];
+
 // Pure DOM modules — keep these on every render mode.  When WebGL is
 // unavailable we still want the cover, mirror, toolbar, story modal,
 // onboarding, and demo machinery to mount so the user gets a working
@@ -79,8 +82,13 @@ const EXPERIENCE_SEQUENCE = [
 const DOM_ONLY_CATEGORIES = new Set(['input', 'ui', 'demo']);
 
 function getExperienceSequence() {
-  if (SM.webglOK) return EXPERIENCE_SEQUENCE;
-  return EXPERIENCE_SEQUENCE.filter(([category]) => DOM_ONLY_CATEGORIES.has(category));
+  if (SM.webglOK) return INTERACTIVE_SEQUENCE;
+  return INTERACTIVE_SEQUENCE.filter(([category]) => DOM_ONLY_CATEGORIES.has(category));
+}
+
+function getEnhancementSequence() {
+  if (!SM.webglOK) return [];
+  return ENHANCEMENT_SEQUENCE;
 }
 
 
@@ -246,6 +254,7 @@ async function loadModules(sequence, options = {}) {
   const total = options.total ?? sequence.length;
   const offset = options.offset ?? 0;
   const phase = options.phase ?? 'boot';
+  const publishProgress = options.publishProgress ?? true;
 
   for (const [index, [category, name, loader]] of sequence.entries()) {
     try {
@@ -265,7 +274,9 @@ async function loadModules(sequence, options = {}) {
     } catch (error) {
       console.warn(`[SM] skip ${category}.${name}:`, error?.message || error);
     } finally {
-      publishLoadingProgress(phase, offset + index + 1, total, `${category}.${name}`);
+      if (publishProgress) {
+        publishLoadingProgress(phase, offset + index + 1, total, `${category}.${name}`);
+      }
       if (options.yieldBetween) {
         await yieldToBrowser();
       }
@@ -289,9 +300,19 @@ function showErrorChip(message) {
   }, 4000);
 }
 
-function queueDeferredModules() {
+function queueDeferredModules(enhancementSequence = []) {
   const loadDeferred = async () => {
-    await loadModules(DEFERRED_SEQUENCE);
+    if (enhancementSequence.length) {
+      await loadModules(enhancementSequence, {
+        phase: 'enhancement',
+        publishProgress: false,
+        yieldBetween: true,
+      });
+    }
+    await loadModules(DEFERRED_SEQUENCE, {
+      phase: 'deferred',
+      publishProgress: false,
+    });
     SM.bus.emit('app:deferred-ready');
   };
 
@@ -342,6 +363,7 @@ async function init() {
 
   bindInputTargets();
   const experienceSequence = getExperienceSequence();
+  const enhancementSequence = getEnhancementSequence();
   const totalCoreModules = BOOT_SEQUENCE.length + experienceSequence.length;
   publishLoadingProgress('boot', 0, totalCoreModules, 'boot');
   await loadModules(BOOT_SEQUENCE, {
@@ -363,7 +385,7 @@ async function init() {
   await loadFallbackIfNeeded();
   SM.appReady = true;
   publishLoadingProgress('ready', totalCoreModules, totalCoreModules, 'ready');
-  queueDeferredModules();
+  queueDeferredModules(enhancementSequence);
 
   if (SM.debug) {
     console.log('%c[SM] debug mode enabled: try SM.go("sphere")', 'color:#ffaa00');
