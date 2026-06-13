@@ -87,6 +87,8 @@ body::after {
 
 #cover-container {
   display: block;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 #webgl-canvas {
@@ -337,6 +339,10 @@ body[data-state="share"] #upload-container {
   align-items: safe center;
   justify-items: center;
   padding: 32px 32px 56px;
+}
+
+.cover-screen {
+  min-height: 100%;
 }
 
 .mirror-screen {
@@ -1704,5 +1710,43 @@ body[data-state="share"] .memory-toolbar {
   }
   .shard-story {
     padding: 16px;
+  }
+}
+
+@media (max-height: 1100px) {
+  .cover-screen {
+    align-items: start;
+    padding-top: 20px;
+    padding-bottom: 28px;
+  }
+
+  .cover-card {
+    width: min(680px, 100%);
+  }
+
+  .cover-hero {
+    width: min(28vw, 250px);
+    margin-bottom: 12px;
+  }
+
+  .eyebrow {
+    margin-bottom: 10px;
+  }
+
+  .cover-card h1 {
+    font-size: clamp(2rem, 4.1vw, 3.5rem);
+    margin-bottom: 14px;
+    max-width: 10ch;
+  }
+
+  .cover-copy {
+    margin-bottom: 18px;
+    width: min(520px, 100%);
+    line-height: 1.52;
+  }
+
+  .cover-preview-grid,
+  .cover-stats {
+    display: none;
   }
 }
